@@ -1,0 +1,938 @@
+{% extends 'base.html' %}
+
+{% block title %}Waste Management - Space Station Cargo Management{% endblock %}
+
+{% block heading %}Waste Management{% endblock %}
+
+{% block header_buttons %}
+<div class="btn-group me-2">
+    <button type="button" class="btn btn-sm btn-outline-danger" id="checkForWasteBtn">
+        <i class="fas fa-search"></i> Check for Waste
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshWasteBtn">
+        <i class="fas fa-sync-alt"></i> Refresh
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-lg-12">
+        <div class="card bg-dark text-white">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Waste Items Overview</h5>
+                <button type="button" class="btn btn-outline-danger" id="prepareForReturnBtn">
+                    <i class="fas fa-rocket"></i> Prepare for Return Shipment
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info" id="wasteInfoAlert">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Waste items are those that have expired or have been fully used. They should be properly managed and prepared for return shipment.
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Dimensions</th>
+                                <th>Mass</th>
+                                <th>Reason</th>
+                                <th>Container</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="wasteItemsTable">
+                            <!-- Waste items will be loaded here -->
+                            <tr>
+                                <td colspan="7" class="text-center">
+                                    <div class="spinner-border text-secondary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-2">Loading waste items...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="noWasteMessage" class="empty-state d-none">
+                    <i class="fas fa-check-circle"></i>
+                    <h4>No Waste Items</h4>
+                    <p>There are currently no waste items that need to be managed.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-7">
+        <div class="card bg-dark text-white">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Waste Return Planning</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <h6>Return Weight Limit</h6>
+                    <div class="input-group mb-3">
+                        <input type="number" class="form-control" id="maxWeightInput" placeholder="Maximum weight in kg" min="0">
+                        <button class="btn btn-outline-primary" id="calculateReturnBtn">Calculate Return</button>
+                    </div>
+                    <small class="text-muted">Set a maximum weight limit for the return shipment. Leave blank for unlimited weight.</small>
+                </div>
+                
+                <div id="returnCalculationResults" class="d-none">
+                    <div class="alert alert-success mb-3">
+                        <h6 class="alert-heading">Return Shipment Details</h6>
+                        <p><strong>Total Items:</strong> <span id="returnTotalItems">0</span></p>
+                        <p><strong>Total Weight:</strong> <span id="returnTotalWeight">0</span> kg</p>
+                        <p id="returnNoteText" class="mb-0"></p>
+                    </div>
+                    
+                    <h6>Items Selected for Return</h6>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Mass</th>
+                                    <th>Location</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="selectedForReturnTable">
+                                <!-- Items selected for return will be listed here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-3">
+                        <button class="btn btn-danger" id="startUndockingBtn">
+                            <i class="fas fa-rocket"></i> Start Undocking Process
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card bg-dark text-white h-100">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Container Assignment</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="containerSelectDropdown" class="form-label">Select Return Container</label>
+                    <select class="form-select" id="containerSelectDropdown">
+                        <option value="" selected>-- Select a container --</option>
+                        <!-- Containers will be loaded here -->
+                    </select>
+                </div>
+                
+                <div id="containerInfoPanel" class="mb-3 d-none">
+                    <div class="card bg-dark border-secondary">
+                        <div class="card-body">
+                            <h6 class="card-title" id="selectedContainerName">Container Name</h6>
+                            <p class="card-text">
+                                <strong>Dimensions:</strong> <span id="selectedContainerDimensions">--</span><br>
+                                <strong>Zone:</strong> <span id="selectedContainerZone">--</span><br>
+                                <strong>Current Items:</strong> <span id="selectedContainerItems">--</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="assignItemsSection" class="d-none">
+                    <h6>Assign Items to Container</h6>
+                    <div class="mb-3">
+                        <select class="form-select" id="wasteItemSelectDropdown">
+                            <option value="" selected>-- Select a waste item --</option>
+                            <!-- Waste items will be loaded here -->
+                        </select>
+                    </div>
+                    
+                    <div class="d-grid mb-3">
+                        <button class="btn btn-primary" id="assignItemBtn" disabled>
+                            <i class="fas fa-arrow-right"></i> Assign to Container
+                        </button>
+                    </div>
+                    
+                    <div class="alert alert-warning mb-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Make sure to place waste items in the return container before undocking.
+                    </div>
+                    
+                    <h6>Items in Return Container</h6>
+                    <div class="list-group" id="itemsInContainerList">
+                        <!-- Items in container will be listed here -->
+                        <div class="list-group-item bg-dark text-white text-center">
+                            No items in this container
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for undocking confirmation -->
+<div class="modal fade" id="undockConfirmationModal" tabindex="-1" aria-labelledby="undockConfirmationModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="undockConfirmationModalLabel">Confirm Undocking</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger mb-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Warning:</strong> You are about to undock container <span id="undockContainerName">--</span>.
+                </div>
+                <p>This will remove all waste items in this container from the inventory. This action cannot be undone.</p>
+                <p><strong>Total items to be returned:</strong> <span id="undockTotalItems">0</span></p>
+                <p><strong>Total weight:</strong> <span id="undockTotalWeight">0</span> kg</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmUndockBtn">Confirm Undocking</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for undock results -->
+<div class="modal fade" id="undockResultsModal" tabindex="-1" aria-labelledby="undockResultsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="undockResultsModalLabel">Undocking Complete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-success mb-3">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Container <span id="undockResultContainerName">--</span> has been successfully undocked and all waste items have been returned.
+                </div>
+                
+                <h6>Undock Manifest</h6>
+                <div class="mb-3">
+                    <p><strong>Undock Time:</strong> <span id="undockResultTime">--</span></p>
+                    <p><strong>Total Items:</strong> <span id="undockResultItems">--</span></p>
+                    <p><strong>Total Mass:</strong> <span id="undockResultMass">--</span> kg</p>
+                </div>
+                
+                <h6>Returned Items</h6>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Mass</th>
+                            </tr>
+                        </thead>
+                        <tbody id="undockResultItemsTable">
+                            <!-- Undocked items will be listed here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast container for notifications -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Global variables
+let wasteItems = [];
+let containers = [];
+let selectedReturnItems = [];
+let selectedContainerId = null;
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Load waste items
+    loadWasteItems();
+    
+    // Load containers
+    loadContainers();
+    
+    // Set up event listeners
+    setupEventListeners();
+});
+
+// Set up event listeners
+function setupEventListeners() {
+    // Check for waste button
+    document.getElementById('checkForWasteBtn').addEventListener('click', checkForWaste);
+    
+    // Refresh button
+    document.getElementById('refreshWasteBtn').addEventListener('click', loadWasteItems);
+    
+    // Calculate return button
+    document.getElementById('calculateReturnBtn').addEventListener('click', calculateReturn);
+    
+    // Container select dropdown
+    document.getElementById('containerSelectDropdown').addEventListener('change', handleContainerSelection);
+    
+    // Waste item select dropdown
+    document.getElementById('wasteItemSelectDropdown').addEventListener('change', function() {
+        document.getElementById('assignItemBtn').disabled = !this.value;
+    });
+    
+    // Assign item button
+    document.getElementById('assignItemBtn').addEventListener('click', assignItemToContainer);
+    
+    // Prepare for return button
+    document.getElementById('prepareForReturnBtn').addEventListener('click', prepareForReturn);
+    
+    // Start undocking button
+    document.getElementById('startUndockingBtn').addEventListener('click', showUndockConfirmation);
+    
+    // Confirm undock button
+    document.getElementById('confirmUndockBtn').addEventListener('click', processUndocking);
+}
+
+// Load waste items from API
+async function loadWasteItems() {
+    try {
+        // Show loading state
+        document.getElementById('wasteItemsTable').innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center">
+                    <div class="spinner-border text-secondary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading waste items...</p>
+                </td>
+            </tr>
+        `;
+        
+        // Fetch waste items
+        const response = await fetch('/api/waste/items');
+        const data = await response.json();
+        
+        if (data.success) {
+            wasteItems = data.data;
+            renderWasteItems();
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+            document.getElementById('wasteItemsTable').innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center">Error loading waste items</td>
+                </tr>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading waste items:', error);
+        showToast('Error loading waste items. Please try again.', 'danger');
+        document.getElementById('wasteItemsTable').innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center">Error loading waste items</td>
+            </tr>
+        `;
+    }
+}
+
+// Render waste items table
+function renderWasteItems() {
+    const tableBody = document.getElementById('wasteItemsTable');
+    const noWasteMessage = document.getElementById('noWasteMessage');
+    
+    if (wasteItems.length === 0) {
+        tableBody.innerHTML = '';
+        noWasteMessage.classList.remove('d-none');
+        return;
+    }
+    
+    noWasteMessage.classList.add('d-none');
+    tableBody.innerHTML = '';
+    
+    wasteItems.forEach(item => {
+        const row = document.createElement('tr');
+        
+        // Determine reason for waste
+        let reason = 'Unknown';
+        if (item.is_expired) {
+            reason = 'Expired';
+        } else if (item.is_used_up) {
+            reason = 'Fully Used';
+        }
+        
+        row.innerHTML = `
+            <td>${item.id}</td>
+            <td>${item.name}</td>
+            <td>${item.width} × ${item.depth} × ${item.height} cm</td>
+            <td>${item.mass} kg</td>
+            <td><span class="badge bg-danger">${reason}</span></td>
+            <td>${item.container_id || 'Not stored'}</td>
+            <td>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-info view-waste-btn" data-item-id="${item.id}" title="View Details">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-outline-primary assign-waste-btn" data-item-id="${item.id}" title="Assign to Container">
+                        <i class="fas fa-box-open"></i>
+                    </button>
+                </div>
+            </td>
+        `;
+        
+        tableBody.appendChild(row);
+    });
+    
+    // Add event listeners to buttons
+    document.querySelectorAll('.view-waste-btn').forEach(btn => {
+        btn.addEventListener('click', () => viewWasteItem(btn.dataset.itemId));
+    });
+    
+    document.querySelectorAll('.assign-waste-btn').forEach(btn => {
+        btn.addEventListener('click', () => selectItemForAssignment(btn.dataset.itemId));
+    });
+    
+    // Update the waste item dropdown
+    updateWasteItemDropdown();
+}
+
+// Check for new waste items
+async function checkForWaste() {
+    try {
+        // Disable button
+        const button = document.getElementById('checkForWasteBtn');
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Checking...';
+        
+        // Fetch waste check API
+        const response = await fetch('/api/waste/check');
+        const data = await response.json();
+        
+        // Reset button
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-search"></i> Check for Waste';
+        
+        if (data.success) {
+            const newWasteCount = data.data.newly_wasted_count;
+            
+            if (newWasteCount > 0) {
+                showToast(`Found ${newWasteCount} new waste items`, 'success');
+                
+                // Reload waste items
+                loadWasteItems();
+            } else {
+                showToast('No new waste items found', 'info');
+            }
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error checking for waste:', error);
+        showToast('Error checking for waste. Please try again.', 'danger');
+        
+        // Reset button
+        const button = document.getElementById('checkForWasteBtn');
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-search"></i> Check for Waste';
+    }
+}
+
+// View waste item details
+function viewWasteItem(itemId) {
+    const item = wasteItems.find(item => item.id === itemId);
+    if (!item) return;
+    
+    // For now, we'll just show a toast with some details
+    // In a real application, you might want to show a modal with more details
+    const reason = item.is_expired ? 'Expired' : (item.is_used_up ? 'Fully Used' : 'Unknown');
+    const message = `
+        <strong>${item.name}</strong><br>
+        ID: ${item.id}<br>
+        Reason: ${reason}<br>
+        Location: ${item.container_id || 'Not stored'}
+    `;
+    
+    showToast(message, 'info', 8000);
+}
+
+// Load containers from API
+async function loadContainers() {
+    try {
+        // Fetch containers
+        const response = await fetch('/api/containers');
+        const data = await response.json();
+        
+        if (data.success) {
+            containers = data.data;
+            
+            // Update container dropdown
+            const dropdown = document.getElementById('containerSelectDropdown');
+            dropdown.innerHTML = '<option value="" selected>-- Select a container --</option>';
+            
+            containers.forEach(container => {
+                const option = document.createElement('option');
+                option.value = container.id;
+                option.textContent = `${container.id} (${container.zone_name})`;
+                dropdown.appendChild(option);
+            });
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error loading containers:', error);
+        showToast('Error loading containers. Please try again.', 'danger');
+    }
+}
+
+// Handle container selection
+async function handleContainerSelection() {
+    const containerId = this.value;
+    selectedContainerId = containerId;
+    
+    if (!containerId) {
+        document.getElementById('containerInfoPanel').classList.add('d-none');
+        document.getElementById('assignItemsSection').classList.add('d-none');
+        return;
+    }
+    
+    try {
+        // Show loading state
+        document.getElementById('containerInfoPanel').classList.remove('d-none');
+        document.getElementById('selectedContainerName').textContent = 'Loading...';
+        document.getElementById('selectedContainerDimensions').textContent = '--';
+        document.getElementById('selectedContainerZone').textContent = '--';
+        document.getElementById('selectedContainerItems').textContent = '--';
+        
+        // Fetch container details
+        const response = await fetch(`/api/containers/${containerId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const container = data.data;
+            
+            // Update container info
+            document.getElementById('selectedContainerName').textContent = container.id;
+            document.getElementById('selectedContainerDimensions').textContent = `${container.width} × ${container.depth} × ${container.height} cm`;
+            document.getElementById('selectedContainerZone').textContent = container.zone_name;
+            
+            const itemCount = container.items ? container.items.length : 0;
+            document.getElementById('selectedContainerItems').textContent = itemCount;
+            
+            // Show assign items section
+            document.getElementById('assignItemsSection').classList.remove('d-none');
+            
+            // Update items in container list
+            updateItemsInContainerList(container.items);
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+            document.getElementById('containerInfoPanel').classList.add('d-none');
+            document.getElementById('assignItemsSection').classList.add('d-none');
+        }
+    } catch (error) {
+        console.error('Error loading container details:', error);
+        showToast('Error loading container details. Please try again.', 'danger');
+        document.getElementById('containerInfoPanel').classList.add('d-none');
+        document.getElementById('assignItemsSection').classList.add('d-none');
+    }
+}
+
+// Update items in container list
+function updateItemsInContainerList(items) {
+    const list = document.getElementById('itemsInContainerList');
+    list.innerHTML = '';
+    
+    if (!items || items.length === 0) {
+        list.innerHTML = `
+            <div class="list-group-item bg-dark text-white text-center">
+                No items in this container
+            </div>
+        `;
+        return;
+    }
+    
+    // Filter for waste items only
+    const wasteItemsInContainer = items.filter(item => item.is_waste);
+    
+    if (wasteItemsInContainer.length === 0) {
+        list.innerHTML = `
+            <div class="list-group-item bg-dark text-white text-center">
+                No waste items in this container
+            </div>
+        `;
+        return;
+    }
+    
+    // Add each waste item to the list
+    wasteItemsInContainer.forEach(item => {
+        const listItem = document.createElement('div');
+        listItem.className = 'list-group-item bg-dark text-white d-flex justify-content-between align-items-center';
+        
+        listItem.innerHTML = `
+            <div>
+                <strong>${item.name}</strong>
+                <small class="d-block text-muted">ID: ${item.id}</small>
+            </div>
+            <span class="badge bg-danger rounded-pill">${item.mass} kg</span>
+        `;
+        
+        list.appendChild(listItem);
+    });
+}
+
+// Update waste item dropdown
+function updateWasteItemDropdown() {
+    const dropdown = document.getElementById('wasteItemSelectDropdown');
+    dropdown.innerHTML = '<option value="" selected>-- Select a waste item --</option>';
+    
+    // Only show waste items not already in a container
+    const unassignedWaste = wasteItems.filter(item => !item.container_id);
+    
+    unassignedWaste.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item.id;
+        option.textContent = `${item.name} (${item.mass} kg)`;
+        dropdown.appendChild(option);
+    });
+    
+    // Disable dropdown if no items
+    if (unassignedWaste.length === 0) {
+        dropdown.disabled = true;
+        dropdown.innerHTML = '<option value="" selected>No unassigned waste items</option>';
+    } else {
+        dropdown.disabled = false;
+    }
+}
+
+// Select item for assignment
+function selectItemForAssignment(itemId) {
+    const dropdown = document.getElementById('containerSelectDropdown');
+    
+    // If no container is selected, prompt user to select one
+    if (!dropdown.value) {
+        showToast('Please select a container first', 'warning');
+        dropdown.focus();
+        return;
+    }
+    
+    // Set the item in the dropdown
+    const itemDropdown = document.getElementById('wasteItemSelectDropdown');
+    itemDropdown.value = itemId;
+    
+    // Enable assign button
+    document.getElementById('assignItemBtn').disabled = false;
+    
+    // Scroll to the assignment section
+    document.getElementById('assignItemsSection').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Assign item to container
+async function assignItemToContainer() {
+    const itemId = document.getElementById('wasteItemSelectDropdown').value;
+    const containerId = selectedContainerId;
+    
+    if (!itemId || !containerId) {
+        showToast('Please select both an item and a container', 'warning');
+        return;
+    }
+    
+    try {
+        // Disable assign button
+        const button = document.getElementById('assignItemBtn');
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Assigning...';
+        
+        // Find the container
+        const container = containers.find(c => c.id === containerId);
+        if (!container) {
+            showToast('Container not found', 'danger');
+            return;
+        }
+        
+        // Find the item
+        const item = wasteItems.find(i => i.id === itemId);
+        if (!item) {
+            showToast('Item not found', 'danger');
+            return;
+        }
+        
+        // Call the API to move waste to container
+        const response = await fetch('/api/waste/move-to-container', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                item_id: itemId,
+                container_id: containerId
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Reset button
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-arrow-right"></i> Assign to Container';
+        
+        if (data.success) {
+            showToast(`${item.name} successfully assigned to container ${containerId}`, 'success');
+            
+            // Reload waste items
+            loadWasteItems();
+            
+            // Reload container details
+            const containerDropdown = document.getElementById('containerSelectDropdown');
+            containerDropdown.dispatchEvent(new Event('change'));
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error assigning item to container:', error);
+        showToast('Error assigning item to container. Please try again.', 'danger');
+        
+        // Reset button
+        const button = document.getElementById('assignItemBtn');
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-arrow-right"></i> Assign to Container';
+    }
+}
+
+// Prepare for return shipment
+async function prepareForReturn() {
+    try {
+        // Get max weight (if provided)
+        const maxWeightInput = document.getElementById('maxWeightInput');
+        const maxWeight = maxWeightInput.value ? parseFloat(maxWeightInput.value) : null;
+        
+        // Call API
+        const response = await fetch('/api/waste/prepare-return', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                max_weight: maxWeight
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Store selected items
+            selectedReturnItems = data.data.items;
+            
+            // Show results
+            document.getElementById('returnCalculationResults').classList.remove('d-none');
+            document.getElementById('returnTotalItems').textContent = data.data.total_items;
+            document.getElementById('returnTotalWeight').textContent = data.data.total_weight.toFixed(2);
+            
+            // Set note text if any
+            const noteText = data.data.note || '';
+            document.getElementById('returnNoteText').textContent = noteText;
+            
+            // Update selected items table
+            const tableBody = document.getElementById('selectedForReturnTable');
+            tableBody.innerHTML = '';
+            
+            selectedReturnItems.forEach(item => {
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td>${item.id}</td>
+                    <td>${item.name}</td>
+                    <td>${item.mass} kg</td>
+                    <td>${item.container_id || 'Not assigned'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary assign-for-return-btn" data-item-id="${item.id}" 
+                                ${item.container_id ? 'disabled' : ''}>
+                            Assign
+                        </button>
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+            
+            // Add event listeners to assign buttons
+            document.querySelectorAll('.assign-for-return-btn').forEach(btn => {
+                btn.addEventListener('click', () => selectItemForAssignment(btn.dataset.itemId));
+            });
+            
+            // Scroll to results
+            document.getElementById('returnCalculationResults').scrollIntoView({ behavior: 'smooth' });
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error preparing for return:', error);
+        showToast('Error preparing for return. Please try again.', 'danger');
+    }
+}
+
+// Show undock confirmation modal
+function showUndockConfirmation() {
+    if (!selectedContainerId) {
+        showToast('Please select a container for undocking', 'warning');
+        return;
+    }
+    
+    // Check if there are waste items in the container
+    fetch(`/api/containers/${selectedContainerId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const container = data.data;
+                const wasteItemsInContainer = container.items ? container.items.filter(item => item.is_waste) : [];
+                
+                if (wasteItemsInContainer.length === 0) {
+                    showToast('No waste items in selected container', 'warning');
+                    return;
+                }
+                
+                // Set modal values
+                document.getElementById('undockContainerName').textContent = selectedContainerId;
+                document.getElementById('undockTotalItems').textContent = wasteItemsInContainer.length;
+                
+                // Calculate total weight
+                const totalWeight = wasteItemsInContainer.reduce((sum, item) => sum + item.mass, 0);
+                document.getElementById('undockTotalWeight').textContent = totalWeight.toFixed(2);
+                
+                // Show modal
+                const modal = new bootstrap.Modal(document.getElementById('undockConfirmationModal'));
+                modal.show();
+            } else {
+                showToast(`Error: ${data.error}`, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading container details:', error);
+            showToast('Error loading container details. Please try again.', 'danger');
+        });
+}
+
+// Process undocking
+async function processUndocking() {
+    if (!selectedContainerId) return;
+    
+    try {
+        // Disable button
+        const button = document.getElementById('confirmUndockBtn');
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+        
+        // Call undock API
+        const response = await fetch('/api/waste/undock', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                container_id: selectedContainerId
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Close confirmation modal
+        const confirmModal = bootstrap.Modal.getInstance(document.getElementById('undockConfirmationModal'));
+        confirmModal.hide();
+        
+        if (data.success) {
+            // Show results modal
+            document.getElementById('undockResultContainerName').textContent = data.data.container_id;
+            document.getElementById('undockResultTime').textContent = new Date(data.data.undock_time).toLocaleString();
+            document.getElementById('undockResultItems').textContent = data.data.total_items;
+            document.getElementById('undockResultMass').textContent = data.data.total_mass.toFixed(2);
+            
+            // Update items table
+            const tableBody = document.getElementById('undockResultItemsTable');
+            tableBody.innerHTML = '';
+            
+            data.data.items.forEach(item => {
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td>${item.id}</td>
+                    <td>${item.name}</td>
+                    <td>${item.mass} kg</td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+            
+            // Show results modal
+            const resultsModal = new bootstrap.Modal(document.getElementById('undockResultsModal'));
+            resultsModal.show();
+            
+            // Reload waste items and reset container selection
+            loadWasteItems();
+            selectedContainerId = null;
+            document.getElementById('containerSelectDropdown').value = '';
+            document.getElementById('containerInfoPanel').classList.add('d-none');
+            document.getElementById('assignItemsSection').classList.add('d-none');
+            document.getElementById('returnCalculationResults').classList.add('d-none');
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error processing undocking:', error);
+        showToast('Error processing undocking. Please try again.', 'danger');
+        
+        // Close confirmation modal
+        const confirmModal = bootstrap.Modal.getInstance(document.getElementById('undockConfirmationModal'));
+        confirmModal.hide();
+    } finally {
+        // Reset button
+        const button = document.getElementById('confirmUndockBtn');
+        button.disabled = false;
+        button.innerHTML = 'Confirm Undocking';
+    }
+}
+
+// Calculate return shipment
+function calculateReturn() {
+    // Get max weight
+    const maxWeightInput = document.getElementById('maxWeightInput');
+    const maxWeight = maxWeightInput.value ? parseFloat(maxWeightInput.value) : null;
+    
+    // Call prepare for return
+    prepareForReturn();
+}
+
+// Helper function to show toast notifications
+function showToast(message, type = 'info', duration = 5000) {
+    const toastContainer = document.getElementById('toastContainer');
+    const toastId = 'toast-' + Date.now();
+    
+    const html = `
+        <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    `;
+    
+    toastContainer.insertAdjacentHTML('beforeend', html);
+    
+    const toastElement = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastElement, { autohide: true, delay: duration });
+    toast.show();
+    
+    // Remove the toast element after it's hidden
+    toastElement.addEventListener('hidden.bs.toast', function() {
+        toastElement.remove();
+    });
+}
+</script>
+{% endblock %}

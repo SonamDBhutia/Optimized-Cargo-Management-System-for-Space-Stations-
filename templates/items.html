@@ -1,0 +1,1180 @@
+{% extends 'base.html' %}
+
+{% block title %}Items - Space Station Cargo Management{% endblock %}
+
+{% block heading %}Items Management{% endblock %}
+
+{% block header_buttons %}
+<div class="btn-group me-2">
+    <button type="button" class="btn btn-sm btn-outline-primary" id="addItemBtn">
+        <i class="fas fa-plus"></i> Add Item
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshItemsBtn">
+        <i class="fas fa-sync-alt"></i> Refresh
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-lg-12">
+        <div class="card bg-dark text-white">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Item Inventory</h5>
+                <div class="input-group" style="width: 300px;">
+                    <input type="text" class="form-control" id="itemSearchInput" placeholder="Search items...">
+                    <button class="btn btn-outline-secondary" type="button" id="itemSearchBtn">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-sm btn-outline-secondary active" id="showAllItemsBtn">All Items</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="showStoredItemsBtn">Stored Items</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="showUnplacedItemsBtn">Unplaced Items</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="showWasteItemsBtn">Waste Items</button>
+                    </div>
+                    
+                    <div class="dropdown d-inline-block ms-2">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="zoneFilterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            Filter by Zone
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="zoneFilterDropdown" id="zoneFilterList">
+                            <li><a class="dropdown-item active" href="#" data-zone="all">All Zones</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            {% for zone in zones %}
+                            <li><a class="dropdown-item" href="#" data-zone="{{ zone.id }}">{{ zone.name }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    
+                    <div class="dropdown d-inline-block ms-2">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="sortDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            Sort By
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="sortDropdown" id="sortList">
+                            <li><a class="dropdown-item active" href="#" data-sort="priority-desc">Priority (High-Low)</a></li>
+                            <li><a class="dropdown-item" href="#" data-sort="priority-asc">Priority (Low-High)</a></li>
+                            <li><a class="dropdown-item" href="#" data-sort="name-asc">Name (A-Z)</a></li>
+                            <li><a class="dropdown-item" href="#" data-sort="name-desc">Name (Z-A)</a></li>
+                            <li><a class="dropdown-item" href="#" data-sort="expiry-asc">Expiry (Soonest First)</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Dimensions</th>
+                                <th>Priority</th>
+                                <th>Container</th>
+                                <th>Expiry</th>
+                                <th>Usage</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsTableBody">
+                            <!-- Items will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="noItemsMessage" class="empty-state d-none">
+                    <i class="fas fa-box-open"></i>
+                    <h4>No Items Found</h4>
+                    <p>No items match your current filters.</p>
+                </div>
+                
+                <div id="loadingItems" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading items...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Item Details Modal -->
+<div class="modal fade" id="itemDetailsModal" tabindex="-1" aria-labelledby="itemDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="itemDetailsModalLabel">Item Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Basic Information</h6>
+                        <div class="mb-3">
+                            <p><strong>ID:</strong> <span id="detailItemId">--</span></p>
+                            <p><strong>Name:</strong> <span id="detailItemName">--</span></p>
+                            <p><strong>Dimensions:</strong> <span id="detailItemDimensions">--</span></p>
+                            <p><strong>Mass:</strong> <span id="detailItemMass">--</span> kg</p>
+                            <p><strong>Priority:</strong> <span id="detailItemPriority">--</span></p>
+                        </div>
+                        
+                        <h6>Status Information</h6>
+                        <div class="mb-3">
+                            <p><strong>Expiry Date:</strong> <span id="detailItemExpiry">--</span></p>
+                            <p><strong>Usage:</strong> <span id="detailItemUsage">--</span></p>
+                            <p><strong>Is Waste:</strong> <span id="detailItemWaste">--</span></p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Location Information</h6>
+                        <div class="mb-3">
+                            <p><strong>Preferred Zone:</strong> <span id="detailItemPreferredZone">--</span></p>
+                            <p><strong>Current Container:</strong> <span id="detailItemContainer">--</span></p>
+                            <p><strong>Position:</strong> <span id="detailItemPosition">--</span></p>
+                        </div>
+                        
+                        <h6>Actions</h6>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-primary" id="viewItemLocationBtn">
+                                <i class="fas fa-map-marker-alt"></i> View Location
+                            </button>
+                            <button class="btn btn-outline-success" id="suggestPlacementBtn">
+                                <i class="fas fa-box"></i> Suggest Placement
+                            </button>
+                            <button class="btn btn-outline-warning" id="retrieveItemBtn">
+                                <i class="fas fa-hand-paper"></i> Retrieve Item
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Retrieval Steps -->
+                <div id="retrievalStepsSection" class="mt-3 d-none">
+                    <h6>Retrieval Steps</h6>
+                    <div class="alert alert-info">
+                        <p id="retrievalStepsText">This item requires <strong>0 steps</strong> to retrieve.</p>
+                    </div>
+                    <div id="blockingItemsList" class="d-none">
+                        <p>Items blocking access:</p>
+                        <ul id="blockingItemsUl" class="list-group">
+                            <!-- Blocking items will be listed here -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger" id="markAsWasteBtn">Mark as Waste</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Item Modal -->
+<div class="modal fade" id="addEditItemModal" tabindex="-1" aria-labelledby="addEditItemModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addEditItemModalLabel">Add New Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addEditItemForm">
+                    <div class="mb-3">
+                        <label for="itemId" class="form-label">Item ID</label>
+                        <input type="text" class="form-control" id="itemId" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="itemName" class="form-label">Item Name</label>
+                        <input type="text" class="form-control" id="itemName" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="itemWidth" class="form-label">Width (cm)</label>
+                            <input type="number" min="1" class="form-control" id="itemWidth" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="itemDepth" class="form-label">Depth (cm)</label>
+                            <input type="number" min="1" class="form-control" id="itemDepth" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="itemHeight" class="form-label">Height (cm)</label>
+                            <input type="number" min="1" class="form-control" id="itemHeight" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="itemMass" class="form-label">Mass (kg)</label>
+                        <input type="number" min="0.1" step="0.1" class="form-control" id="itemMass" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="itemPriority" class="form-label">Priority (1-100)</label>
+                        <input type="range" class="form-range" min="1" max="100" id="itemPriority" required>
+                        <div class="text-center" id="priorityValueDisplay">50</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="itemExpiryDate" class="form-label">Expiry Date</label>
+                        <input type="date" class="form-control" id="itemExpiryDate">
+                        <small class="text-muted">Leave blank for non-expiring items</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="itemUsageLimit" class="form-label">Usage Limit</label>
+                        <input type="number" min="1" class="form-control" id="itemUsageLimit">
+                        <small class="text-muted">Leave blank for non-consumable items</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="itemPreferredZone" class="form-label">Preferred Zone</label>
+                        <select class="form-select" id="itemPreferredZone">
+                            <option value="">-- Select Zone --</option>
+                            {% for zone in zones %}
+                            <option value="{{ zone.id }}">{{ zone.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveItemBtn">Save Item</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Placement Suggestion Modal -->
+<div class="modal fade" id="placementSuggestionModal" tabindex="-1" aria-labelledby="placementSuggestionModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="placementSuggestionModalLabel">Suggested Placement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="placementLoading" class="text-center py-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Finding optimal placement...</p>
+                </div>
+                
+                <div id="placementResult" class="d-none">
+                    <div class="alert alert-success">
+                        <strong>Optimal placement found!</strong>
+                    </div>
+                    
+                    <div class="card bg-dark border-primary mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title" id="suggestedContainerName">--</h5>
+                            <p class="card-text">
+                                <strong>Position:</strong> <span id="suggestedPosition">--</span><br>
+                                <strong>Rotation:</strong> <span id="suggestedRotation">--</span><br>
+                                <strong>Score:</strong> <span id="suggestedScore">--</span>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <p>Would you like to place the item in this location now?</p>
+                </div>
+                
+                <div id="placementError" class="d-none">
+                    <div class="alert alert-danger" id="placementErrorMessage">
+                        No suitable placement found.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary d-none" id="executePlacementBtn">Place Item</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add astronaut name for item operations modal -->
+<div class="modal fade" id="astronautNameModal" tabindex="-1" aria-labelledby="astronautNameModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="astronautNameModalLabel">Enter Astronaut Name</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="astronautName" class="form-label">Astronaut Name</label>
+                    <input type="text" class="form-control" id="astronautName" placeholder="Enter astronaut name...">
+                </div>
+                <div class="form-check mb-3" id="useItemCheckWrapper">
+                    <input class="form-check-input" type="checkbox" id="useItemCheck">
+                    <label class="form-check-label" for="useItemCheck">
+                        Mark as used (will reduce usage count)
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmActionBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast container for notifications -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Variables to store the current state
+let currentItems = [];
+let currentFilter = 'all';
+let currentZone = 'all';
+let currentSort = 'priority-desc';
+let currentSearchTerm = '';
+let currentItemId = null;
+let currentAction = null;
+let placementSuggestion = null;
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Load items
+    loadItems();
+    
+    // Set up event listeners
+    setupEventListeners();
+});
+
+// Set up event listeners
+function setupEventListeners() {
+    // Filter buttons
+    document.getElementById('showAllItemsBtn').addEventListener('click', () => setFilter('all'));
+    document.getElementById('showStoredItemsBtn').addEventListener('click', () => setFilter('stored'));
+    document.getElementById('showUnplacedItemsBtn').addEventListener('click', () => setFilter('unplaced'));
+    document.getElementById('showWasteItemsBtn').addEventListener('click', () => setFilter('waste'));
+    
+    // Zone filter
+    const zoneLinks = document.querySelectorAll('#zoneFilterList a');
+    zoneLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            setZoneFilter(link.dataset.zone);
+        });
+    });
+    
+    // Sort options
+    const sortLinks = document.querySelectorAll('#sortList a');
+    sortLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            setSortOrder(link.dataset.sort);
+        });
+    });
+    
+    // Search
+    document.getElementById('itemSearchBtn').addEventListener('click', searchItems);
+    document.getElementById('itemSearchInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            searchItems();
+        }
+    });
+    
+    // Refresh button
+    document.getElementById('refreshItemsBtn').addEventListener('click', loadItems);
+    
+    // Add item button
+    document.getElementById('addItemBtn').addEventListener('click', showAddItemModal);
+    
+    // Save item button
+    document.getElementById('saveItemBtn').addEventListener('click', saveItem);
+    
+    // Priority slider display
+    document.getElementById('itemPriority').addEventListener('input', function() {
+        document.getElementById('priorityValueDisplay').textContent = this.value;
+    });
+    
+    // View item location button
+    document.getElementById('viewItemLocationBtn').addEventListener('click', viewItemLocation);
+    
+    // Retrieve item button
+    document.getElementById('retrieveItemBtn').addEventListener('click', initiateItemRetrieval);
+    
+    // Mark as waste button
+    document.getElementById('markAsWasteBtn').addEventListener('click', markItemAsWaste);
+    
+    // Suggest placement button
+    document.getElementById('suggestPlacementBtn').addEventListener('click', suggestItemPlacement);
+    
+    // Execute placement button
+    document.getElementById('executePlacementBtn').addEventListener('click', executePlacement);
+    
+    // Confirm action button (for retrieval/placement)
+    document.getElementById('confirmActionBtn').addEventListener('click', confirmItemAction);
+}
+
+// Load items from API
+async function loadItems() {
+    try {
+        // Show loading state
+        document.getElementById('loadingItems').classList.remove('d-none');
+        document.getElementById('itemsTableBody').classList.add('d-none');
+        document.getElementById('noItemsMessage').classList.add('d-none');
+        
+        // Fetch items
+        const response = await fetch('/api/items');
+        const data = await response.json();
+        
+        if (data.success) {
+            // Store all items
+            currentItems = data.data;
+            
+            // Apply filters and render
+            renderItems();
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+        }
+        
+        // Hide loading state
+        document.getElementById('loadingItems').classList.add('d-none');
+    } catch (error) {
+        console.error('Error loading items:', error);
+        showToast('Error loading items. Please try again.', 'danger');
+        document.getElementById('loadingItems').classList.add('d-none');
+    }
+}
+
+// Render items in the table
+function renderItems() {
+    const tableBody = document.getElementById('itemsTableBody');
+    tableBody.innerHTML = '';
+    
+    // Filter items
+    let filteredItems = filterItems(currentItems);
+    
+    // Sort items
+    filteredItems = sortItems(filteredItems);
+    
+    // Show/hide table and no items message
+    if (filteredItems.length === 0) {
+        document.getElementById('itemsTableBody').classList.add('d-none');
+        document.getElementById('noItemsMessage').classList.remove('d-none');
+        return;
+    } else {
+        document.getElementById('itemsTableBody').classList.remove('d-none');
+        document.getElementById('noItemsMessage').classList.add('d-none');
+    }
+    
+    // Render each item
+    filteredItems.forEach(item => {
+        const row = document.createElement('tr');
+        
+        // Add priority class based on priority level
+        if (item.priority >= 80) {
+            row.classList.add('table-danger');
+        } else if (item.priority >= 50) {
+            row.classList.add('table-warning');
+        }
+        
+        // If waste, add waste class
+        if (item.is_waste) {
+            row.classList.add('table-danger');
+        }
+        
+        // Format expiry date
+        const expiryText = item.expiry_date ? 
+            new Date(item.expiry_date).toLocaleDateString() : 
+            'N/A';
+        
+        // Format usage
+        const usageText = item.usage_limit ? 
+            `${item.uses_remaining || 0}/${item.usage_limit}` : 
+            'N/A';
+        
+        // Format status
+        let statusText = '';
+        let statusClass = '';
+        
+        if (item.is_waste) {
+            statusText = 'Waste';
+            statusClass = 'badge bg-danger';
+        } else if (item.is_expired) {
+            statusText = 'Expired';
+            statusClass = 'badge bg-warning text-dark';
+        } else if (item.container_id) {
+            statusText = 'Stored';
+            statusClass = 'badge bg-success';
+        } else {
+            statusText = 'Unplaced';
+            statusClass = 'badge bg-secondary';
+        }
+        
+        // Create table row
+        row.innerHTML = `
+            <td>${item.id}</td>
+            <td>${item.name}</td>
+            <td>${item.width} × ${item.depth} × ${item.height} cm</td>
+            <td>${item.priority}</td>
+            <td>${item.container_id || 'Not stored'}</td>
+            <td>${expiryText}</td>
+            <td>${usageText}</td>
+            <td><span class="${statusClass}">${statusText}</span></td>
+            <td>
+                <button class="btn btn-sm btn-outline-info view-item-btn" data-item-id="${item.id}">
+                    <i class="fas fa-eye"></i>
+                </button>
+            </td>
+        `;
+        
+        tableBody.appendChild(row);
+    });
+    
+    // Add click event to view buttons
+    const viewButtons = document.querySelectorAll('.view-item-btn');
+    viewButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            viewItemDetails(button.dataset.itemId);
+        });
+    });
+}
+
+// Filter items based on current filter options
+function filterItems(items) {
+    // First apply filter by type
+    let filtered = items.filter(item => {
+        if (currentFilter === 'all') return true;
+        if (currentFilter === 'stored') return item.container_id && !item.is_waste;
+        if (currentFilter === 'unplaced') return !item.container_id && !item.is_waste;
+        if (currentFilter === 'waste') return item.is_waste;
+        return true;
+    });
+    
+    // Then filter by zone if specified
+    if (currentZone !== 'all') {
+        filtered = filtered.filter(item => {
+            if (item.preferred_zone_id == currentZone) return true;
+            return false;
+        });
+    }
+    
+    // Apply search term if any
+    if (currentSearchTerm) {
+        const term = currentSearchTerm.toLowerCase();
+        filtered = filtered.filter(item => {
+            return (
+                item.id.toLowerCase().includes(term) ||
+                item.name.toLowerCase().includes(term)
+            );
+        });
+    }
+    
+    return filtered;
+}
+
+// Sort items based on current sort option
+function sortItems(items) {
+    if (currentSort === 'priority-desc') {
+        return [...items].sort((a, b) => b.priority - a.priority);
+    } else if (currentSort === 'priority-asc') {
+        return [...items].sort((a, b) => a.priority - b.priority);
+    } else if (currentSort === 'name-asc') {
+        return [...items].sort((a, b) => a.name.localeCompare(b.name));
+    } else if (currentSort === 'name-desc') {
+        return [...items].sort((a, b) => b.name.localeCompare(a.name));
+    } else if (currentSort === 'expiry-asc') {
+        return [...items].sort((a, b) => {
+            if (!a.expiry_date) return 1;
+            if (!b.expiry_date) return -1;
+            return new Date(a.expiry_date) - new Date(b.expiry_date);
+        });
+    }
+    
+    return items;
+}
+
+// Set the current filter and update the UI
+function setFilter(filter) {
+    currentFilter = filter;
+    
+    // Update active button
+    const buttons = [
+        'showAllItemsBtn', 
+        'showStoredItemsBtn', 
+        'showUnplacedItemsBtn', 
+        'showWasteItemsBtn'
+    ];
+    
+    buttons.forEach(btnId => {
+        document.getElementById(btnId).classList.remove('active');
+    });
+    
+    // Map filter to button ID
+    const buttonMap = {
+        'all': 'showAllItemsBtn',
+        'stored': 'showStoredItemsBtn',
+        'unplaced': 'showUnplacedItemsBtn',
+        'waste': 'showWasteItemsBtn'
+    };
+    
+    document.getElementById(buttonMap[filter]).classList.add('active');
+    
+    // Re-render items
+    renderItems();
+}
+
+// Set the zone filter
+function setZoneFilter(zoneId) {
+    currentZone = zoneId;
+    
+    // Update dropdown button text
+    const selectedZone = document.querySelector(`#zoneFilterList a[data-zone="${zoneId}"]`);
+    const dropdownButton = document.getElementById('zoneFilterDropdown');
+    
+    if (zoneId === 'all') {
+        dropdownButton.textContent = 'Filter by Zone';
+    } else {
+        dropdownButton.textContent = `Zone: ${selectedZone.textContent}`;
+    }
+    
+    // Update active class
+    const zoneLinks = document.querySelectorAll('#zoneFilterList a');
+    zoneLinks.forEach(link => {
+        link.classList.remove('active');
+    });
+    selectedZone.classList.add('active');
+    
+    // Re-render items
+    renderItems();
+}
+
+// Set the sort order
+function setSortOrder(sort) {
+    currentSort = sort;
+    
+    // Update dropdown button text
+    const selectedSort = document.querySelector(`#sortList a[data-sort="${sort}"]`);
+    
+    // Update active class
+    const sortLinks = document.querySelectorAll('#sortList a');
+    sortLinks.forEach(link => {
+        link.classList.remove('active');
+    });
+    selectedSort.classList.add('active');
+    
+    // Re-render items
+    renderItems();
+}
+
+// Search items
+function searchItems() {
+    currentSearchTerm = document.getElementById('itemSearchInput').value.trim();
+    renderItems();
+}
+
+// Show add item modal
+function showAddItemModal() {
+    // Reset form
+    document.getElementById('addEditItemForm').reset();
+    
+    // Set default priority
+    document.getElementById('itemPriority').value = 50;
+    document.getElementById('priorityValueDisplay').textContent = '50';
+    
+    // Update modal title
+    document.getElementById('addEditItemModalLabel').textContent = 'Add New Item';
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('addEditItemModal'));
+    modal.show();
+}
+
+// Save item
+async function saveItem() {
+    // Get form data
+    const itemData = {
+        id: document.getElementById('itemId').value,
+        name: document.getElementById('itemName').value,
+        width: parseFloat(document.getElementById('itemWidth').value),
+        depth: parseFloat(document.getElementById('itemDepth').value),
+        height: parseFloat(document.getElementById('itemHeight').value),
+        mass: parseFloat(document.getElementById('itemMass').value),
+        priority: parseInt(document.getElementById('itemPriority').value),
+        expiry_date: document.getElementById('itemExpiryDate').value || null,
+        usage_limit: document.getElementById('itemUsageLimit').value || null,
+        preferred_zone_id: document.getElementById('itemPreferredZone').value || null
+    };
+    
+    try {
+        // Disable save button
+        const saveButton = document.getElementById('saveItemBtn');
+        saveButton.disabled = true;
+        saveButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+        
+        // Send to API
+        const response = await fetch('/api/items', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(itemData)
+        });
+        
+        const data = await response.json();
+        
+        // Reset button
+        saveButton.disabled = false;
+        saveButton.innerHTML = 'Save Item';
+        
+        if (data.success) {
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addEditItemModal'));
+            modal.hide();
+            
+            // Show success message
+            showToast('Item added successfully!', 'success');
+            
+            // Reload items
+            loadItems();
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error saving item:', error);
+        showToast('Error saving item. Please try again.', 'danger');
+        
+        // Reset button
+        const saveButton = document.getElementById('saveItemBtn');
+        saveButton.disabled = false;
+        saveButton.innerHTML = 'Save Item';
+    }
+}
+
+// View item details
+async function viewItemDetails(itemId) {
+    try {
+        const response = await fetch(`/api/items/${itemId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const item = data.data;
+            currentItemId = item.id;
+            
+            // Fill modal with item details
+            document.getElementById('detailItemId').textContent = item.id;
+            document.getElementById('detailItemName').textContent = item.name;
+            document.getElementById('detailItemDimensions').textContent = `${item.width} × ${item.depth} × ${item.height} cm`;
+            document.getElementById('detailItemMass').textContent = item.mass;
+            document.getElementById('detailItemPriority').textContent = item.priority;
+            
+            // Format expiry date
+            const expiryText = item.expiry_date ? 
+                new Date(item.expiry_date).toLocaleDateString() : 
+                'N/A';
+            document.getElementById('detailItemExpiry').textContent = expiryText;
+            
+            // Format usage
+            const usageText = item.usage_limit ? 
+                `${item.uses_remaining || 0}/${item.usage_limit}` : 
+                'N/A';
+            document.getElementById('detailItemUsage').textContent = usageText;
+            
+            // Waste status
+            document.getElementById('detailItemWaste').textContent = item.is_waste ? 'Yes' : 'No';
+            
+            // Preferred zone
+            document.getElementById('detailItemPreferredZone').textContent = item.preferred_zone_name || 'None';
+            
+            // Container
+            document.getElementById('detailItemContainer').textContent = item.container_id || 'Not stored';
+            
+            // Position
+            const positionText = (item.x_pos !== null && item.y_pos !== null && item.z_pos !== null) ? 
+                `(${item.x_pos}, ${item.y_pos}, ${item.z_pos})` : 
+                'N/A';
+            document.getElementById('detailItemPosition').textContent = positionText;
+            
+            // Show/hide buttons based on item state
+            document.getElementById('viewItemLocationBtn').disabled = !item.container_id;
+            document.getElementById('retrieveItemBtn').disabled = !item.container_id || item.is_waste;
+            document.getElementById('suggestPlacementBtn').disabled = item.container_id !== null || item.is_waste;
+            document.getElementById('markAsWasteBtn').disabled = item.is_waste;
+            
+            // Hide retrieval steps section initially
+            document.getElementById('retrievalStepsSection').classList.add('d-none');
+            
+            // If item is in a container, fetch retrieval steps
+            if (item.container_id) {
+                fetchRetrievalSteps(item.id);
+            }
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('itemDetailsModal'));
+            modal.show();
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error viewing item details:', error);
+        showToast('Error loading item details. Please try again.', 'danger');
+    }
+}
+
+// Fetch retrieval steps for an item
+async function fetchRetrievalSteps(itemId) {
+    try {
+        const response = await fetch(`/api/retrieval/steps?item_id=${itemId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Show retrieval steps section
+            document.getElementById('retrievalStepsSection').classList.remove('d-none');
+            
+            const steps = data.data.steps;
+            document.getElementById('retrievalStepsText').innerHTML = `This item requires <strong>${steps} steps</strong> to retrieve.`;
+            
+            // Show blocking items if any
+            const blockingItems = data.data.blocking_items;
+            if (blockingItems && blockingItems.length > 0) {
+                document.getElementById('blockingItemsList').classList.remove('d-none');
+                
+                const blockingItemsUl = document.getElementById('blockingItemsUl');
+                blockingItemsUl.innerHTML = '';
+                
+                blockingItems.forEach(item => {
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item bg-dark text-white border-secondary';
+                    li.textContent = `${item.name} (ID: ${item.id})`;
+                    blockingItemsUl.appendChild(li);
+                });
+            } else {
+                document.getElementById('blockingItemsList').classList.add('d-none');
+            }
+        } else {
+            document.getElementById('retrievalStepsSection').classList.add('d-none');
+        }
+    } catch (error) {
+        console.error('Error fetching retrieval steps:', error);
+        document.getElementById('retrievalStepsSection').classList.add('d-none');
+    }
+}
+
+// View item location in 3D visualization
+function viewItemLocation() {
+    if (!currentItemId) return;
+    
+    // Get container ID
+    const containerID = document.getElementById('detailItemContainer').textContent;
+    if (containerID === 'Not stored') {
+        showToast('Item is not stored in any container', 'warning');
+        return;
+    }
+    
+    // Close details modal
+    const detailsModal = bootstrap.Modal.getInstance(document.getElementById('itemDetailsModal'));
+    detailsModal.hide();
+    
+    // Open visualization modal
+    showContainerVisualization(containerID, currentItemId);
+}
+
+// Initiate item retrieval
+function initiateItemRetrieval() {
+    if (!currentItemId) return;
+    
+    // Set current action
+    currentAction = 'retrieve';
+    
+    // Close details modal
+    const detailsModal = bootstrap.Modal.getInstance(document.getElementById('itemDetailsModal'));
+    detailsModal.hide();
+    
+    // Show astronaut name modal
+    document.getElementById('astronautNameModalLabel').textContent = 'Retrieve Item';
+    document.getElementById('useItemCheckWrapper').classList.remove('d-none');
+    document.getElementById('astronautName').value = '';
+    document.getElementById('useItemCheck').checked = false;
+    
+    const modal = new bootstrap.Modal(document.getElementById('astronautNameModal'));
+    modal.show();
+}
+
+// Mark item as waste
+async function markItemAsWaste() {
+    if (!currentItemId) return;
+    
+    if (!confirm('Are you sure you want to mark this item as waste?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/waste/mark', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                item_id: currentItemId,
+                reason: 'Manually marked as waste'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('itemDetailsModal'));
+            modal.hide();
+            
+            // Show success message
+            showToast('Item marked as waste successfully', 'success');
+            
+            // Reload items
+            loadItems();
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error marking item as waste:', error);
+        showToast('Error marking item as waste. Please try again.', 'danger');
+    }
+}
+
+// Suggest item placement
+async function suggestItemPlacement() {
+    if (!currentItemId) return;
+    
+    // Close details modal
+    const detailsModal = bootstrap.Modal.getInstance(document.getElementById('itemDetailsModal'));
+    detailsModal.hide();
+    
+    // Show placement suggestion modal
+    const modal = new bootstrap.Modal(document.getElementById('placementSuggestionModal'));
+    modal.show();
+    
+    // Show loading state
+    document.getElementById('placementLoading').classList.remove('d-none');
+    document.getElementById('placementResult').classList.add('d-none');
+    document.getElementById('placementError').classList.add('d-none');
+    document.getElementById('executePlacementBtn').classList.add('d-none');
+    
+    try {
+        const response = await fetch('/api/placement/suggest', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                item_id: currentItemId
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Hide loading state
+        document.getElementById('placementLoading').classList.add('d-none');
+        
+        if (data.success) {
+            // Store placement suggestion
+            placementSuggestion = data.data;
+            
+            // Show result
+            document.getElementById('placementResult').classList.remove('d-none');
+            document.getElementById('suggestedContainerName').textContent = `Container: ${placementSuggestion.container_id}`;
+            document.getElementById('suggestedPosition').textContent = `(${placementSuggestion.x}, ${placementSuggestion.y}, ${placementSuggestion.z})`;
+            document.getElementById('suggestedRotation').textContent = placementSuggestion.rotated ? 'Yes' : 'No';
+            document.getElementById('suggestedScore').textContent = placementSuggestion.score.toFixed(2);
+            
+            // Show execute button
+            document.getElementById('executePlacementBtn').classList.remove('d-none');
+        } else {
+            // Show error
+            document.getElementById('placementError').classList.remove('d-none');
+            document.getElementById('placementErrorMessage').textContent = data.error;
+        }
+    } catch (error) {
+        console.error('Error suggesting placement:', error);
+        
+        // Hide loading state and show error
+        document.getElementById('placementLoading').classList.add('d-none');
+        document.getElementById('placementError').classList.remove('d-none');
+        document.getElementById('placementErrorMessage').textContent = 'Error suggesting placement. Please try again.';
+    }
+}
+
+// Execute placement
+function executePlacement() {
+    if (!currentItemId || !placementSuggestion) return;
+    
+    // Set current action
+    currentAction = 'place';
+    
+    // Close placement modal
+    const placementModal = bootstrap.Modal.getInstance(document.getElementById('placementSuggestionModal'));
+    placementModal.hide();
+    
+    // Show astronaut name modal
+    document.getElementById('astronautNameModalLabel').textContent = 'Place Item';
+    document.getElementById('useItemCheckWrapper').classList.add('d-none');
+    document.getElementById('astronautName').value = '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('astronautNameModal'));
+    modal.show();
+}
+
+// Confirm item action (retrieval or placement)
+async function confirmItemAction() {
+    const astronautName = document.getElementById('astronautName').value.trim();
+    
+    if (!astronautName) {
+        showToast('Please enter astronaut name', 'warning');
+        return;
+    }
+    
+    if (currentAction === 'retrieve') {
+        await retrieveItem(astronautName);
+    } else if (currentAction === 'place') {
+        await placeItem(astronautName);
+    }
+}
+
+// Retrieve an item
+async function retrieveItem(astronautName) {
+    if (!currentItemId) return;
+    
+    const useItem = document.getElementById('useItemCheck').checked;
+    
+    try {
+        // Disable confirm button
+        const confirmButton = document.getElementById('confirmActionBtn');
+        confirmButton.disabled = true;
+        confirmButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+        
+        const response = await fetch('/api/retrieval/execute', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                item_id: currentItemId,
+                astronaut_name: astronautName,
+                use_item: useItem
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Reset button
+        confirmButton.disabled = false;
+        confirmButton.innerHTML = 'Confirm';
+        
+        if (data.success) {
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('astronautNameModal'));
+            modal.hide();
+            
+            // Show success message
+            showToast(`Item ${data.data.name} retrieved successfully by ${astronautName}`, 'success');
+            
+            // Reload items
+            loadItems();
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error retrieving item:', error);
+        showToast('Error retrieving item. Please try again.', 'danger');
+        
+        // Reset button
+        const confirmButton = document.getElementById('confirmActionBtn');
+        confirmButton.disabled = false;
+        confirmButton.innerHTML = 'Confirm';
+    }
+}
+
+// Place an item
+async function placeItem(astronautName) {
+    if (!currentItemId || !placementSuggestion) return;
+    
+    try {
+        // Disable confirm button
+        const confirmButton = document.getElementById('confirmActionBtn');
+        confirmButton.disabled = true;
+        confirmButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+        
+        const response = await fetch('/api/placement/execute', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                item_id: currentItemId,
+                container_id: placementSuggestion.container_id,
+                x: placementSuggestion.x,
+                y: placementSuggestion.y,
+                z: placementSuggestion.z,
+                rotated: placementSuggestion.rotated,
+                astronaut_name: astronautName
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Reset button
+        confirmButton.disabled = false;
+        confirmButton.innerHTML = 'Confirm';
+        
+        if (data.success) {
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('astronautNameModal'));
+            modal.hide();
+            
+            // Show success message
+            showToast(`Item placed successfully in container ${placementSuggestion.container_id}`, 'success');
+            
+            // Reset placement suggestion
+            placementSuggestion = null;
+            
+            // Reload items
+            loadItems();
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error placing item:', error);
+        showToast('Error placing item. Please try again.', 'danger');
+        
+        // Reset button
+        const confirmButton = document.getElementById('confirmActionBtn');
+        confirmButton.disabled = false;
+        confirmButton.innerHTML = 'Confirm';
+    }
+}
+
+// Helper function to show toast notifications
+function showToast(message, type = 'info') {
+    const toastId = 'toast-' + Date.now();
+    const html = `
+        <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('toastContainer').insertAdjacentHTML('beforeend', html);
+    
+    const toastElement = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastElement, { autohide: true, delay: 5000 });
+    toast.show();
+    
+    // Remove the toast element after it's hidden
+    toastElement.addEventListener('hidden.bs.toast', function() {
+        toastElement.remove();
+    });
+}
+</script>
+{% endblock %}
+

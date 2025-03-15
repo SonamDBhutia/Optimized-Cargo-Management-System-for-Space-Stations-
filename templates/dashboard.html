@@ -1,0 +1,229 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Space Station Cargo Management{% endblock %}
+
+{% block heading %}Dashboard{% endblock %}
+
+{% block header_buttons %}
+<div class="btn-group me-2">
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshDashboardBtn">
+        <i class="fas fa-sync-alt"></i> Refresh
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-dark text-white">
+            <div class="card-body">
+                <h5 class="card-title">Total Items</h5>
+                <p class="card-text display-4">{{ total_items }}</p>
+                <small class="text-muted">Active inventory items</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-dark text-white">
+            <div class="card-body">
+                <h5 class="card-title">Waste Items</h5>
+                <p class="card-text display-4">{{ total_waste }}</p>
+                <small class="text-muted">Items marked as waste</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-dark text-white">
+            <div class="card-body">
+                <h5 class="card-title">Containers</h5>
+                <p class="card-text display-4">{{ total_containers }}</p>
+                <small class="text-muted">Total storage containers</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card bg-dark text-white">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Items by Zone</h5>
+            </div>
+            <div class="card-body">
+                <div id="zoneChart" style="height: 300px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card bg-dark text-white">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Recent Activity</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Action</th>
+                                <th>Item</th>
+                                <th>By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in recent_logs %}
+                            <tr>
+                                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>{{ log.action | capitalize }}</td>
+                                <td>{{ log.item.name if log.item else 'Unknown' }}</td>
+                                <td>{{ log.astronaut_name if log.astronaut_name else '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card bg-dark text-white">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Zone Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover">
+                        <thead>
+                            <tr>
+                                <th>Zone</th>
+                                <th>Items</th>
+                                <th>Containers</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in zone_stats %}
+                            <tr>
+                                <td>{{ stat.zone_name }}</td>
+                                <td>{{ stat.items_count }}</td>
+                                <td>{{ stat.containers_count }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-info view-zone-btn" data-zone="{{ stat.zone_name }}">
+                                        <i class="fas fa-eye"></i> View
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Draw zone chart
+    const zoneData = [
+        {% for stat in zone_stats %}
+        {
+            zone: "{{ stat.zone_name }}",
+            count: {{ stat.items_count }}
+        },
+        {% endfor %}
+    ];
+    
+    drawZoneChart(zoneData);
+    
+    // View zone button handler
+    const viewZoneButtons = document.querySelectorAll('.view-zone-btn');
+    viewZoneButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const zone = this.dataset.zone;
+            window.location.href = `/containers?zone=${encodeURIComponent(zone)}`;
+        });
+    });
+    
+    // Refresh dashboard button
+    const refreshBtn = document.getElementById('refreshDashboardBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function() {
+            window.location.reload();
+        });
+    }
+});
+
+function drawZoneChart(data) {
+    // Set up dimensions
+    const width = document.getElementById('zoneChart').clientWidth;
+    const height = 300;
+    const margin = {top: 20, right: 20, bottom: 30, left: 40};
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+    
+    // Clear previous chart if any
+    d3.select("#zoneChart").html("");
+    
+    // Create SVG
+    const svg = d3.select("#zoneChart")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height)
+        .append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+    
+    // Set up scales
+    const x = d3.scaleBand()
+        .domain(data.map(d => d.zone))
+        .range([0, chartWidth])
+        .padding(0.1);
+    
+    const y = d3.scaleLinear()
+        .domain([0, d3.max(data, d => d.count) || 10])
+        .nice()
+        .range([chartHeight, 0]);
+    
+    // Add X axis
+    svg.append("g")
+        .attr("transform", `translate(0,${chartHeight})`)
+        .call(d3.axisBottom(x))
+        .selectAll("text")
+        .attr("transform", "rotate(-45)")
+        .style("text-anchor", "end");
+    
+    // Add Y axis
+    svg.append("g")
+        .call(d3.axisLeft(y));
+    
+    // Add bars
+    svg.selectAll(".bar")
+        .data(data)
+        .enter()
+        .append("rect")
+        .attr("class", "bar")
+        .attr("x", d => x(d.zone))
+        .attr("y", d => y(d.count))
+        .attr("width", x.bandwidth())
+        .attr("height", d => chartHeight - y(d.count))
+        .attr("fill", "#0d6efd");
+    
+    // Add labels
+    svg.selectAll(".label")
+        .data(data)
+        .enter()
+        .append("text")
+        .attr("class", "label")
+        .attr("x", d => x(d.zone) + x.bandwidth() / 2)
+        .attr("y", d => y(d.count) - 5)
+        .attr("text-anchor", "middle")
+        .text(d => d.count)
+        .attr("fill", "white");
+}
+</script>
+{% endblock %}

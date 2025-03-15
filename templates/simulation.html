@@ -1,0 +1,1231 @@
+{% extends 'base.html' %}
+
+{% block title %}Time Simulation - Space Station Cargo Management{% endblock %}
+
+{% block heading %}Time Simulation Management{% endblock %}
+
+{% block header_buttons %}
+<div class="btn-group me-2">
+    <button type="button" class="btn btn-sm btn-outline-primary" id="nextDayBtn">
+        <i class="fas fa-calendar-day"></i> Next Day
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-warning" id="fastForwardBtn">
+        <i class="fas fa-forward"></i> Fast Forward
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-lg-4">
+        <div class="card bg-dark text-white h-100">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Time Controls</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <h6>Current Status</h6>
+                    <p><strong>Current Simulation Date:</strong> <span id="currentSimDate">--</span></p>
+                    <p><strong>Days Simulated:</strong> <span id="daysSimulated">0</span></p>
+                </div>
+                
+                <div class="mb-4">
+                    <h6>Simulate Next Day</h6>
+                    <p class="text-muted small">Advance the simulation by one day.</p>
+                    <button class="btn btn-primary" id="simulateNextDayBtn">
+                        <i class="fas fa-calendar-day"></i> Advance One Day
+                    </button>
+                </div>
+                
+                <div class="mb-4">
+                    <h6>Fast Forward</h6>
+                    <p class="text-muted small">Advance the simulation by multiple days.</p>
+                    <div class="input-group mb-3">
+                        <input type="number" class="form-control" id="daysToAdvance" placeholder="Number of days" min="1" value="7">
+                        <button class="btn btn-warning" id="advanceDaysBtn">Advance</button>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <h6>Item Usage During Simulation</h6>
+                    <p class="text-muted small">Select items that will be used during the simulation period.</p>
+                    <button class="btn btn-outline-secondary" id="selectItemsToUseBtn">
+                        <i class="fas fa-clipboard-list"></i> Select Items to Use
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card bg-dark text-white">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Forecast & Analysis</h5>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-tabs" id="forecastTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="expiry-tab" data-bs-toggle="tab" data-bs-target="#expiry-tab-pane" type="button" role="tab" aria-controls="expiry-tab-pane" aria-selected="true">
+                            Expiry Forecast
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="usage-tab" data-bs-toggle="tab" data-bs-target="#usage-tab-pane" type="button" role="tab" aria-controls="usage-tab-pane" aria-selected="false">
+                            Usage Forecast
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="activity-tab" data-bs-toggle="tab" data-bs-target="#activity-tab-pane" type="button" role="tab" aria-controls="activity-tab-pane" aria-selected="false">
+                            Activity Log
+                        </button>
+                    </li>
+                </ul>
+                <div class="tab-content p-3" id="forecastTabsContent">
+                    <div class="tab-pane fade show active" id="expiry-tab-pane" role="tabpanel" aria-labelledby="expiry-tab" tabindex="0">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6>Items Expiring Soon</h6>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-secondary" id="refresh30DayForecastBtn">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="forecastDaysDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                        30 Days
+                                    </button>
+                                    <ul class="dropdown-menu" aria-labelledby="forecastDaysDropdown">
+                                        <li><a class="dropdown-item active" href="#" data-days="30">30 Days</a></li>
+                                        <li><a class="dropdown-item" href="#" data-days="60">60 Days</a></li>
+                                        <li><a class="dropdown-item" href="#" data-days="90">90 Days</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="expiryChart" style="height: 200px;"></div>
+                        
+                        <div id="expiryDetails" class="mt-3">
+                            <div class="table-responsive">
+                                <table class="table table-dark table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Item</th>
+                                            <th>Days Left</th>
+                                            <th>Priority</th>
+                                            <th>Location</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="expiryDetailsTable">
+                                        <!-- Expiry details will be loaded here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div id="noExpiryData" class="alert alert-info d-none">
+                                No items will expire in the selected time period.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="usage-tab-pane" role="tabpanel" aria-labelledby="usage-tab" tabindex="0">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6>Items Depleting Soon (Based on Usage)</h6>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-secondary" id="refreshUsageForecastBtn">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="usageForecastDaysDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                        30 Days
+                                    </button>
+                                    <ul class="dropdown-menu" aria-labelledby="usageForecastDaysDropdown">
+                                        <li><a class="dropdown-item active" href="#" data-days="30">30 Days</a></li>
+                                        <li><a class="dropdown-item" href="#" data-days="60">60 Days</a></li>
+                                        <li><a class="dropdown-item" href="#" data-days="90">90 Days</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="usageChart" style="height: 200px;"></div>
+                        
+                        <div id="usageDetails" class="mt-3">
+                            <div class="table-responsive">
+                                <table class="table table-dark table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Estimated Date</th>
+                                            <th>Item</th>
+                                            <th>Uses Left</th>
+                                            <th>Priority</th>
+                                            <th>Location</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="usageDetailsTable">
+                                        <!-- Usage details will be loaded here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div id="noUsageData" class="alert alert-info d-none">
+                                No items will be depleted in the selected time period.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="activity-tab-pane" role="tabpanel" aria-labelledby="activity-tab" tabindex="0">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6>Recent Activity Log</h6>
+                            <button class="btn btn-sm btn-outline-secondary" id="refreshActivityBtn">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="timeline">
+                            <div id="activityTimeline">
+                                <!-- Activity timeline will be loaded here -->
+                            </div>
+                        </div>
+                        
+                        <div id="noActivityData" class="alert alert-info d-none">
+                            No recent activity recorded.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Select Items to Use Modal -->
+<div class="modal fade" id="selectItemsModal" tabindex="-1" aria-labelledby="selectItemsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="selectItemsModalLabel">Select Items to Use During Simulation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="itemSearchInput" placeholder="Search items...">
+                        <button class="btn btn-outline-secondary" type="button" id="itemSearchBtn">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover">
+                        <thead>
+                            <tr>
+                                <th>Select</th>
+                                <th>Name</th>
+                                <th>Uses Left</th>
+                                <th>Priority</th>
+                                <th>Location</th>
+                                <th>Uses</th>
+                            </tr>
+                        </thead>
+                        <tbody id="useItemsTable">
+                            <!-- Usable items will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="noUsableItems" class="alert alert-info d-none">
+                    No usable items found.
+                </div>
+                
+                <div id="selectedUsableItems" class="mt-3 d-none">
+                    <h6>Selected Items</h6>
+                    <ul class="list-group" id="selectedUsableItemsList">
+                        <!-- Selected usable items will be listed here -->
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmUsableItemsBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fast Forward Confirmation Modal -->
+<div class="modal fade" id="fastForwardModal" tabindex="-1" aria-labelledby="fastForwardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="fastForwardModalLabel">Fast Forward Simulation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="ffDaysInput" class="form-label">Number of Days to Advance</label>
+                    <input type="number" class="form-control" id="ffDaysInput" min="1" value="7">
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="includeItemsCheck" checked>
+                    <label class="form-check-label" for="includeItemsCheck">
+                        Include selected items for usage simulation
+                    </label>
+                </div>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> This action will advance the simulation time and may mark items as expired or depleted. This cannot be undone.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="confirmFastForwardBtn">Fast Forward</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast container for notifications -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Global variables
+let selectedUsableItems = [];
+let expiryForecastDays = 30;
+let usageForecastDays = 30;
+let simulationStartDate = new Date();
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Get the current date
+    getCurrentDate();
+    
+    // Load the forecasts
+    loadExpiryForecast();
+    loadUsageForecast();
+    loadActivityLog();
+    
+    // Set up event listeners
+    setupEventListeners();
+});
+
+// Set up event listeners
+function setupEventListeners() {
+    // Next day button
+    document.getElementById('nextDayBtn').addEventListener('click', simulateNextDay);
+    document.getElementById('simulateNextDayBtn').addEventListener('click', simulateNextDay);
+    
+    // Fast forward buttons
+    document.getElementById('fastForwardBtn').addEventListener('click', showFastForwardModal);
+    document.getElementById('advanceDaysBtn').addEventListener('click', function() {
+        const days = parseInt(document.getElementById('daysToAdvance').value) || 7;
+        showFastForwardModal(days);
+    });
+    
+    // Confirm fast forward
+    document.getElementById('confirmFastForwardBtn').addEventListener('click', confirmFastForward);
+    
+    // Select items to use
+    document.getElementById('selectItemsToUseBtn').addEventListener('click', showSelectItemsModal);
+    
+    // Confirm usable items
+    document.getElementById('confirmUsableItemsBtn').addEventListener('click', confirmUsableItems);
+    
+    // Refresh forecast buttons
+    document.getElementById('refresh30DayForecastBtn').addEventListener('click', loadExpiryForecast);
+    document.getElementById('refreshUsageForecastBtn').addEventListener('click', loadUsageForecast);
+    document.getElementById('refreshActivityBtn').addEventListener('click', loadActivityLog);
+    
+    // Expiry forecast days dropdown
+    const expiryDaysLinks = document.querySelectorAll('#forecastDaysDropdown + .dropdown-menu a');
+    expiryDaysLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            setExpiryForecastDays(parseInt(link.dataset.days));
+        });
+    });
+    
+    // Usage forecast days dropdown
+    const usageDaysLinks = document.querySelectorAll('#usageForecastDaysDropdown + .dropdown-menu a');
+    usageDaysLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            setUsageForecastDays(parseInt(link.dataset.days));
+        });
+    });
+    
+    // Item search in the modal
+    document.getElementById('itemSearchBtn').addEventListener('click', searchUsableItems);
+    document.getElementById('itemSearchInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            searchUsableItems();
+        }
+    });
+}
+
+// Get the current simulation date
+async function getCurrentDate() {
+    try {
+        // For now, we'll just use the system date
+        // In a real implementation, this would fetch from the server
+        simulationStartDate = new Date();
+        document.getElementById('currentSimDate').textContent = simulationStartDate.toLocaleDateString();
+    } catch (error) {
+        console.error('Error getting current date:', error);
+        showToast('Error getting current date. Using system date.', 'warning');
+    }
+}
+
+// Load expiry forecast data
+async function loadExpiryForecast() {
+    try {
+        const response = await fetch(`/api/time/forecast/expiry?days=${expiryForecastDays}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const forecast = data.data;
+            
+            // Update chart
+            drawExpiryChart(forecast);
+            
+            // Update table
+            updateExpiryDetailsTable(forecast);
+        } else {
+            console.error('Error loading expiry forecast:', data.error);
+            showToast(`Error loading expiry forecast: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error loading expiry forecast:', error);
+        showToast('Error loading expiry forecast. Please try again.', 'danger');
+    }
+}
+
+// Load usage forecast data
+async function loadUsageForecast() {
+    try {
+        const response = await fetch(`/api/time/forecast/usage?days=${usageForecastDays}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const forecast = data.data;
+            
+            // Update chart
+            drawUsageChart(forecast);
+            
+            // Update table
+            updateUsageDetailsTable(forecast);
+        } else {
+            console.error('Error loading usage forecast:', data.error);
+            showToast(`Error loading usage forecast: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error loading usage forecast:', error);
+        showToast('Error loading usage forecast. Please try again.', 'danger');
+    }
+}
+
+// Load activity log
+async function loadActivityLog() {
+    try {
+        const response = await fetch('/api/logs?limit=20');
+        const data = await response.json();
+        
+        if (data.success) {
+            updateActivityTimeline(data.data);
+        } else {
+            console.error('Error loading activity log:', data.error);
+            showToast(`Error loading activity log: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error loading activity log:', error);
+        showToast('Error loading activity log. Please try again.', 'danger');
+    }
+}
+
+// Draw expiry forecast chart
+function drawExpiryChart(forecast) {
+    const chartElement = document.getElementById('expiryChart');
+    chartElement.innerHTML = '';
+    
+    if (!forecast || !forecast.forecast || forecast.forecast.length === 0) {
+        chartElement.innerHTML = '<div class="alert alert-info">No expiry data to display</div>';
+        return;
+    }
+    
+    // Prepare data for chart
+    const chartData = [];
+    forecast.forecast.forEach(item => {
+        // Find if this date is already in the data
+        const existingDate = chartData.find(d => d.date === item.date);
+        
+        if (existingDate) {
+            existingDate.count += item.items.length;
+        } else {
+            chartData.push({
+                date: item.date,
+                count: item.items.length,
+                daysFromNow: item.days_from_now
+            });
+        }
+    });
+    
+    // Sort by date
+    chartData.sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    // Set up dimensions
+    const margin = { top: 20, right: 30, bottom: 40, left: 40 };
+    const width = chartElement.clientWidth - margin.left - margin.right;
+    const height = 200 - margin.top - margin.bottom;
+    
+    // Create SVG
+    const svg = d3.select('#expiryChart')
+        .append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+    
+    // X axis (dates)
+    const x = d3.scaleBand()
+        .domain(chartData.map(d => d.date))
+        .range([0, width])
+        .padding(0.1);
+    
+    svg.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x).tickFormat(d => {
+            const date = new Date(d);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }))
+        .selectAll('text')
+        .style('text-anchor', 'end')
+        .attr('dx', '-.8em')
+        .attr('dy', '.15em')
+        .attr('transform', 'rotate(-45)');
+    
+    // Y axis (number of items)
+    const y = d3.scaleLinear()
+        .domain([0, d3.max(chartData, d => d.count)])
+        .nice()
+        .range([height, 0]);
+    
+    svg.append('g')
+        .call(d3.axisLeft(y));
+    
+    // Add bars
+    svg.selectAll('.bar')
+        .data(chartData)
+        .enter()
+        .append('rect')
+        .attr('class', 'bar')
+        .attr('x', d => x(d.date))
+        .attr('width', x.bandwidth())
+        .attr('y', d => y(d.count))
+        .attr('height', d => height - y(d.count))
+        .attr('fill', d => {
+            // Color based on how soon the item expires
+            if (d.daysFromNow <= 7) return '#dc3545'; // Red for soon
+            if (d.daysFromNow <= 14) return '#ffc107'; // Yellow for medium
+            return '#0d6efd'; // Blue for further away
+        });
+    
+    // Add labels on bars
+    svg.selectAll('.label')
+        .data(chartData)
+        .enter()
+        .append('text')
+        .attr('class', 'label')
+        .attr('x', d => x(d.date) + x.bandwidth() / 2)
+        .attr('y', d => y(d.count) - 5)
+        .attr('text-anchor', 'middle')
+        .text(d => d.count)
+        .attr('fill', 'white');
+}
+
+// Update expiry details table
+function updateExpiryDetailsTable(forecast) {
+    const tableBody = document.getElementById('expiryDetailsTable');
+    const noDataMessage = document.getElementById('noExpiryData');
+    
+    tableBody.innerHTML = '';
+    
+    if (!forecast || !forecast.forecast || forecast.forecast.length === 0) {
+        noDataMessage.classList.remove('d-none');
+        return;
+    }
+    
+    noDataMessage.classList.add('d-none');
+    
+    // Flatten the data for the table
+    const tableData = [];
+    forecast.forecast.forEach(dateGroup => {
+        dateGroup.items.forEach(item => {
+            tableData.push({
+                date: dateGroup.date,
+                daysFromNow: dateGroup.days_from_now,
+                item: item
+            });
+        });
+    });
+    
+    // Sort by date (closest first)
+    tableData.sort((a, b) => a.daysFromNow - b.daysFromNow);
+    
+    // Build table rows
+    tableData.forEach(entry => {
+        const row = document.createElement('tr');
+        
+        // Add class based on urgency
+        if (entry.daysFromNow <= 7) {
+            row.classList.add('table-danger');
+        } else if (entry.daysFromNow <= 14) {
+            row.classList.add('table-warning');
+        }
+        
+        // Format date
+        const date = new Date(entry.date);
+        const formattedDate = date.toLocaleDateString();
+        
+        row.innerHTML = `
+            <td>${formattedDate}</td>
+            <td>${entry.item.name}</td>
+            <td>${entry.daysFromNow}</td>
+            <td>${entry.item.priority}</td>
+            <td>${entry.item.container_id || 'Not stored'}</td>
+        `;
+        
+        tableBody.appendChild(row);
+    });
+}
+
+// Draw usage forecast chart
+function drawUsageChart(forecast) {
+    const chartElement = document.getElementById('usageChart');
+    chartElement.innerHTML = '';
+    
+    if (!forecast || !forecast.forecast || forecast.forecast.length === 0) {
+        chartElement.innerHTML = '<div class="alert alert-info">No usage data to display</div>';
+        return;
+    }
+    
+    // Prepare data for chart
+    const chartData = [];
+    forecast.forecast.forEach(item => {
+        // Find if this date is already in the data
+        const existingDate = chartData.find(d => d.date === item.date);
+        
+        if (existingDate) {
+            existingDate.count += item.items.length;
+        } else {
+            chartData.push({
+                date: item.date,
+                count: item.items.length,
+                daysFromNow: item.days_from_now
+            });
+        }
+    });
+    
+    // Sort by date
+    chartData.sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    // Set up dimensions
+    const margin = { top: 20, right: 30, bottom: 40, left: 40 };
+    const width = chartElement.clientWidth - margin.left - margin.right;
+    const height = 200 - margin.top - margin.bottom;
+    
+    // Create SVG
+    const svg = d3.select('#usageChart')
+        .append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+    
+    // X axis (dates)
+    const x = d3.scaleBand()
+        .domain(chartData.map(d => d.date))
+        .range([0, width])
+        .padding(0.1);
+    
+    svg.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x).tickFormat(d => {
+            const date = new Date(d);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }))
+        .selectAll('text')
+        .style('text-anchor', 'end')
+        .attr('dx', '-.8em')
+        .attr('dy', '.15em')
+        .attr('transform', 'rotate(-45)');
+    
+    // Y axis (number of items)
+    const y = d3.scaleLinear()
+        .domain([0, d3.max(chartData, d => d.count)])
+        .nice()
+        .range([height, 0]);
+    
+    svg.append('g')
+        .call(d3.axisLeft(y));
+    
+    // Add bars
+    svg.selectAll('.bar')
+        .data(chartData)
+        .enter()
+        .append('rect')
+        .attr('class', 'bar')
+        .attr('x', d => x(d.date))
+        .attr('width', x.bandwidth())
+        .attr('y', d => y(d.count))
+        .attr('height', d => height - y(d.count))
+        .attr('fill', d => {
+            // Color based on how soon the item depletes
+            if (d.daysFromNow <= 7) return '#dc3545'; // Red for soon
+            if (d.daysFromNow <= 14) return '#ffc107'; // Yellow for medium
+            return '#0d6efd'; // Blue for further away
+        });
+    
+    // Add labels on bars
+    svg.selectAll('.label')
+        .data(chartData)
+        .enter()
+        .append('text')
+        .attr('class', 'label')
+        .attr('x', d => x(d.date) + x.bandwidth() / 2)
+        .attr('y', d => y(d.count) - 5)
+        .attr('text-anchor', 'middle')
+        .text(d => d.count)
+        .attr('fill', 'white');
+}
+
+// Update usage details table
+function updateUsageDetailsTable(forecast) {
+    const tableBody = document.getElementById('usageDetailsTable');
+    const noDataMessage = document.getElementById('noUsageData');
+    
+    tableBody.innerHTML = '';
+    
+    if (!forecast || !forecast.forecast || forecast.forecast.length === 0) {
+        noDataMessage.classList.remove('d-none');
+        return;
+    }
+    
+    noDataMessage.classList.add('d-none');
+    
+    // Flatten the data for the table
+    const tableData = [];
+    forecast.forecast.forEach(dateGroup => {
+        dateGroup.items.forEach(item => {
+            tableData.push({
+                date: dateGroup.date,
+                daysFromNow: dateGroup.days_from_now,
+                item: item
+            });
+        });
+    });
+    
+    // Sort by date (closest first)
+    tableData.sort((a, b) => a.daysFromNow - b.daysFromNow);
+    
+    // Build table rows
+    tableData.forEach(entry => {
+        const row = document.createElement('tr');
+        
+        // Add class based on urgency
+        if (entry.daysFromNow <= 7) {
+            row.classList.add('table-danger');
+        } else if (entry.daysFromNow <= 14) {
+            row.classList.add('table-warning');
+        }
+        
+        // Format date
+        const date = new Date(entry.date);
+        const formattedDate = date.toLocaleDateString();
+        
+        row.innerHTML = `
+            <td>${formattedDate}</td>
+            <td>${entry.item.name}</td>
+            <td>${entry.item.uses_remaining || 0}</td>
+            <td>${entry.item.priority}</td>
+            <td>${entry.item.container_id || 'Not stored'}</td>
+        `;
+        
+        tableBody.appendChild(row);
+    });
+}
+
+// Update activity timeline
+function updateActivityTimeline(activities) {
+    const timelineElement = document.getElementById('activityTimeline');
+    const noDataMessage = document.getElementById('noActivityData');
+    
+    timelineElement.innerHTML = '';
+    
+    if (!activities || activities.length === 0) {
+        noDataMessage.classList.remove('d-none');
+        return;
+    }
+    
+    noDataMessage.classList.add('d-none');
+    
+    // Sort activities by timestamp (newest first)
+    activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    // Build timeline items
+    activities.forEach(activity => {
+        const timelineItem = document.createElement('div');
+        timelineItem.className = 'timeline-item';
+        
+        // Format timestamp
+        const timestamp = new Date(activity.timestamp);
+        const formattedTime = timestamp.toLocaleString();
+        
+        // Determine icon based on action
+        let icon = 'fas fa-cog';
+        let actionColor = 'text-info';
+        
+        switch (activity.action) {
+            case 'placed':
+                icon = 'fas fa-box';
+                actionColor = 'text-success';
+                break;
+            case 'retrieved':
+                icon = 'fas fa-hand-paper';
+                actionColor = 'text-primary';
+                break;
+            case 'used':
+                icon = 'fas fa-check-circle';
+                actionColor = 'text-warning';
+                break;
+            case 'moved':
+                icon = 'fas fa-exchange-alt';
+                actionColor = 'text-info';
+                break;
+            case 'waste':
+                icon = 'fas fa-trash-alt';
+                actionColor = 'text-danger';
+                break;
+            case 'returned':
+                icon = 'fas fa-undo';
+                actionColor = 'text-secondary';
+                break;
+            case 'added':
+                icon = 'fas fa-plus-circle';
+                actionColor = 'text-success';
+                break;
+        }
+        
+        // Format the message based on the action
+        let message = '';
+        const itemName = activity.item_name || 'Unknown item';
+        
+        switch (activity.action) {
+            case 'placed':
+                message = `<strong>${itemName}</strong> was placed in container <strong>${activity.to_container_id}</strong>`;
+                break;
+            case 'retrieved':
+                message = `<strong>${itemName}</strong> was retrieved from container <strong>${activity.from_container_id}</strong>`;
+                break;
+            case 'used':
+                message = `<strong>${itemName}</strong> was used`;
+                break;
+            case 'moved':
+                message = `<strong>${itemName}</strong> was moved from container <strong>${activity.from_container_id}</strong> to <strong>${activity.to_container_id}</strong>`;
+                break;
+            case 'waste':
+                message = `<strong>${itemName}</strong> was marked as waste`;
+                break;
+            case 'returned':
+                message = `<strong>${itemName}</strong> was returned via container <strong>${activity.from_container_id}</strong>`;
+                break;
+            case 'added':
+                message = `<strong>${itemName}</strong> was added to inventory`;
+                break;
+            default:
+                message = `Action <strong>${activity.action}</strong> performed on <strong>${itemName}</strong>`;
+        }
+        
+        // Add astronaut info if available
+        if (activity.astronaut_name) {
+            message += ` by <strong>${activity.astronaut_name}</strong>`;
+        }
+        
+        timelineItem.innerHTML = `
+            <div class="d-flex align-items-center mb-2">
+                <span class="me-2 ${actionColor}"><i class="${icon}"></i></span>
+                <strong>${activity.action.charAt(0).toUpperCase() + activity.action.slice(1)}</strong>
+                <small class="text-muted ms-auto">${formattedTime}</small>
+            </div>
+            <p>${message}</p>
+            ${activity.notes ? `<small class="text-muted">${activity.notes}</small>` : ''}
+        `;
+        
+        timelineElement.appendChild(timelineItem);
+    });
+}
+
+// Set expiry forecast days
+function setExpiryForecastDays(days) {
+    expiryForecastDays = days;
+    
+    // Update dropdown button text
+    document.getElementById('forecastDaysDropdown').textContent = `${days} Days`;
+    
+    // Update active class in dropdown
+    const links = document.querySelectorAll('#forecastDaysDropdown + .dropdown-menu a');
+    links.forEach(link => {
+        link.classList.remove('active');
+        if (parseInt(link.dataset.days) === days) {
+            link.classList.add('active');
+        }
+    });
+    
+    // Reload forecast
+    loadExpiryForecast();
+}
+
+// Set usage forecast days
+function setUsageForecastDays(days) {
+    usageForecastDays = days;
+    
+    // Update dropdown button text
+    document.getElementById('usageForecastDaysDropdown').textContent = `${days} Days`;
+    
+    // Update active class in dropdown
+    const links = document.querySelectorAll('#usageForecastDaysDropdown + .dropdown-menu a');
+    links.forEach(link => {
+        link.classList.remove('active');
+        if (parseInt(link.dataset.days) === days) {
+            link.classList.add('active');
+        }
+    });
+    
+    // Reload forecast
+    loadUsageForecast();
+}
+
+// Show select items modal
+async function showSelectItemsModal() {
+    // Reset selected items
+    selectedUsableItems = [];
+    
+    const modal = new bootstrap.Modal(document.getElementById('selectItemsModal'));
+    modal.show();
+    
+    document.getElementById('useItemsTable').innerHTML = `
+        <tr>
+            <td colspan="6" class="text-center">
+                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                Loading items...
+            </td>
+        </tr>
+    `;
+    
+    document.getElementById('selectedUsableItems').classList.add('d-none');
+    
+    try {
+        // Fetch all non-waste items
+        const response = await fetch('/api/items?waste=false');
+        const data = await response.json();
+        
+        if (data.success) {
+            // Filter for items with usage limits
+            const usableItems = data.data.filter(item => item.usage_limit !== null && item.uses_remaining > 0);
+            
+            const tableBody = document.getElementById('useItemsTable');
+            const noItemsMessage = document.getElementById('noUsableItems');
+            
+            if (usableItems.length === 0) {
+                tableBody.innerHTML = '';
+                noItemsMessage.classList.remove('d-none');
+            } else {
+                noItemsMessage.classList.add('d-none');
+                tableBody.innerHTML = '';
+                
+                usableItems.forEach(item => {
+                    const row = document.createElement('tr');
+                    
+                    row.innerHTML = `
+                        <td>
+                            <div class="form-check">
+                                <input class="form-check-input usable-item-check" type="checkbox" value="${item.id}" 
+                                       data-item-name="${item.name}" id="usable-check-${item.id}">
+                            </div>
+                        </td>
+                        <td>${item.name}</td>
+                        <td>${item.uses_remaining}/${item.usage_limit}</td>
+                        <td>${item.priority}</td>
+                        <td>${item.container_id || 'Not stored'}</td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm uses-input" 
+                                   id="uses-${item.id}" min="1" max="${item.uses_remaining}" value="1" style="width: 70px;">
+                        </td>
+                    `;
+                    
+                    tableBody.appendChild(row);
+                });
+                
+                // Add event listeners to checkboxes
+                const checkboxes = document.querySelectorAll('.usable-item-check');
+                checkboxes.forEach(checkbox => {
+                    checkbox.addEventListener('change', () => {
+                        updateSelectedUsableItems();
+                    });
+                });
+            }
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error loading usable items:', error);
+        showToast('Error loading usable items. Please try again.', 'danger');
+    }
+}
+
+// Update selected usable items
+function updateSelectedUsableItems() {
+    selectedUsableItems = [];
+    const selectedList = document.getElementById('selectedUsableItemsList');
+    selectedList.innerHTML = '';
+    
+    const checkboxes = document.querySelectorAll('.usable-item-check:checked');
+    checkboxes.forEach(checkbox => {
+        const itemId = checkbox.value;
+        const itemName = checkbox.dataset.itemName;
+        const usesInput = document.getElementById(`uses-${itemId}`);
+        const uses = parseInt(usesInput.value) || 1;
+        
+        selectedUsableItems.push({
+            id: itemId,
+            name: itemName,
+            uses: uses
+        });
+        
+        const listItem = document.createElement('li');
+        listItem.className = 'list-group-item bg-dark text-white d-flex justify-content-between align-items-center';
+        listItem.innerHTML = `
+            ${itemName}
+            <span class="badge bg-primary rounded-pill">Uses: ${uses}</span>
+        `;
+        
+        selectedList.appendChild(listItem);
+    });
+    
+    // Show/hide selected items list
+    if (selectedUsableItems.length > 0) {
+        document.getElementById('selectedUsableItems').classList.remove('d-none');
+    } else {
+        document.getElementById('selectedUsableItems').classList.add('d-none');
+    }
+}
+
+// Search usable items
+function searchUsableItems() {
+    const searchTerm = document.getElementById('itemSearchInput').value.trim().toLowerCase();
+    const rows = document.querySelectorAll('#useItemsTable tr');
+    
+    rows.forEach(row => {
+        const nameCell = row.cells[1];
+        if (!nameCell) return;
+        
+        const name = nameCell.textContent.toLowerCase();
+        
+        if (name.includes(searchTerm)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+// Confirm usable items selection
+function confirmUsableItems() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('selectItemsModal'));
+    modal.hide();
+    
+    if (selectedUsableItems.length > 0) {
+        showToast(`Selected ${selectedUsableItems.length} items for simulation`, 'success');
+    }
+}
+
+// Show fast forward modal
+function showFastForwardModal(days) {
+    const daysInput = document.getElementById('ffDaysInput');
+    if (days && !isNaN(days)) {
+        daysInput.value = days;
+    } else {
+        daysInput.value = 7; // Default to 7 days
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('fastForwardModal'));
+    modal.show();
+}
+
+// Confirm fast forward
+async function confirmFastForward() {
+    const days = parseInt(document.getElementById('ffDaysInput').value) || 7;
+    const includeItems = document.getElementById('includeItemsCheck').checked;
+    
+    // Disable the button
+    const confirmButton = document.getElementById('confirmFastForwardBtn');
+    confirmButton.disabled = true;
+    confirmButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+    
+    try {
+        const response = await fetch('/api/time/advance', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                days: days,
+                items_used: includeItems ? selectedUsableItems : []
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('fastForwardModal'));
+        modal.hide();
+        
+        if (data.success) {
+            // Update simulation date
+            const newDate = new Date(data.data.new_date);
+            document.getElementById('currentSimDate').textContent = newDate.toLocaleDateString();
+            
+            // Update days simulated
+            const currentDays = parseInt(document.getElementById('daysSimulated').textContent) || 0;
+            document.getElementById('daysSimulated').textContent = currentDays + days;
+            
+            showToast(`Successfully advanced simulation by ${days} days`, 'success');
+            
+            // Show results
+            const itemsUsed = data.data.items_used || 0;
+            const itemsExpired = data.data.items_expired || 0;
+            const otherWaste = data.data.other_waste_items || 0;
+            
+            if (itemsExpired > 0 || otherWaste > 0) {
+                showToast(`${itemsExpired} items expired and ${otherWaste} other items became waste`, 'warning');
+            }
+            
+            // Refresh forecasts and logs
+            loadExpiryForecast();
+            loadUsageForecast();
+            loadActivityLog();
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error advancing time:', error);
+        showToast('Error advancing time. Please try again.', 'danger');
+    } finally {
+        // Reset the button
+        const confirmButton = document.getElementById('confirmFastForwardBtn');
+        confirmButton.disabled = false;
+        confirmButton.innerHTML = 'Fast Forward';
+    }
+}
+
+// Simulate next day
+async function simulateNextDay() {
+    try {
+        // Disable buttons
+        const buttons = [
+            document.getElementById('nextDayBtn'),
+            document.getElementById('simulateNextDayBtn')
+        ];
+        
+        buttons.forEach(button => {
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+            }
+        });
+        
+        const response = await fetch('/api/time/next-day', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                items_used: selectedUsableItems
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update simulation date
+            const newDate = new Date(data.data.new_date);
+            document.getElementById('currentSimDate').textContent = newDate.toLocaleDateString();
+            
+            // Update days simulated
+            const currentDays = parseInt(document.getElementById('daysSimulated').textContent) || 0;
+            document.getElementById('daysSimulated').textContent = currentDays + 1;
+            
+            showToast('Successfully advanced simulation by 1 day', 'success');
+            
+            // Show results
+            const itemsUsed = data.data.items_used || 0;
+            const itemsExpired = data.data.items_expired || 0;
+            const otherWaste = data.data.other_waste_items || 0;
+            
+            if (itemsExpired > 0 || otherWaste > 0) {
+                showToast(`${itemsExpired} items expired and ${otherWaste} other items became waste`, 'warning');
+            }
+            
+            // Refresh forecasts and logs
+            loadExpiryForecast();
+            loadUsageForecast();
+            loadActivityLog();
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error simulating next day:', error);
+        showToast('Error simulating next day. Please try again.', 'danger');
+    } finally {
+        // Reset buttons
+        const buttons = [
+            document.getElementById('nextDayBtn'),
+            document.getElementById('simulateNextDayBtn')
+        ];
+        
+        buttons.forEach(button => {
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = button.id === 'nextDayBtn' ? 
+                    '<i class="fas fa-calendar-day"></i> Next Day' : 
+                    '<i class="fas fa-calendar-day"></i> Advance One Day';
+            }
+        });
+    }
+}
+
+// Helper function to show toast notifications
+function showToast(message, type = 'info') {
+    const toastContainer = document.getElementById('toastContainer');
+    const toastId = 'toast-' + Date.now();
+    
+    const html = `
+        <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    `;
+    
+    toastContainer.insertAdjacentHTML('beforeend', html);
+    
+    const toastElement = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastElement, { autohide: true, delay: 5000 });
+    toast.show();
+    
+    // Remove the toast element after it's hidden
+    toastElement.addEventListener('hidden.bs.toast', function() {
+        toastElement.remove();
+    });
+}
+</script>
+{% endblock %}

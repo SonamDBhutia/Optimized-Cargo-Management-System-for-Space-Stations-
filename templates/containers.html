@@ -1,0 +1,1322 @@
+{% extends 'base.html' %}
+
+{% block title %}Containers - Space Station Cargo Management{% endblock %}
+
+{% block heading %}Container Management{% endblock %}
+
+{% block header_buttons %}
+<div class="btn-group me-2">
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshContainersBtn">
+        <i class="fas fa-sync-alt"></i> Refresh
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-info" id="viewAll3DBtn">
+        <i class="fas fa-cube"></i> 3D Overview
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-lg-12">
+        <div class="card bg-dark text-white">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Container Overview</h5>
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="zoneFilterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        Filter by Zone
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="zoneFilterDropdown" id="zoneFilterList">
+                        <li><a class="dropdown-item active" href="#" data-zone="all">All Zones</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        {% for zone in zones %}
+                        <li><a class="dropdown-item" href="#" data-zone="{{ zone.id }}">{{ zone.name }}</a></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4" id="containersGrid">
+                    <!-- Containers will be loaded here -->
+                </div>
+                
+                <div id="noContainersMessage" class="empty-state d-none">
+                    <i class="fas fa-box-open"></i>
+                    <h4>No Containers Found</h4>
+                    <p>No containers match your current filters.</p>
+                </div>
+                
+                <div id="loadingContainers" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading containers...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Container Details Modal -->
+<div class="modal fade" id="containerDetailsModal" tabindex="-1" aria-labelledby="containerDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="containerDetailsModalLabel">Container Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <!-- 3D Visualization Container -->
+                        <div id="containerVisualization" style="height: 500px; background-color: #1a1a1a;">
+                            <!-- 3D visualization will be rendered here -->
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <h6>Container Information</h6>
+                            <p><strong>ID:</strong> <span id="detailContainerId">--</span></p>
+                            <p><strong>Dimensions:</strong> <span id="detailContainerDimensions">--</span></p>
+                            <p><strong>Zone:</strong> <span id="detailContainerZone">--</span></p>
+                            <p><strong>Items:</strong> <span id="detailContainerItemCount">--</span></p>
+                            <p><strong>Space Usage:</strong> <span id="detailContainerSpaceUsage">--</span>%</p>
+                        </div>
+                        
+                        <h6>Items in Container</h6>
+                        <div class="mb-3" style="max-height: 300px; overflow-y: auto;">
+                            <table class="table table-dark table-hover table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Priority</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="containerItemsTable">
+                                    <!-- Container items will be loaded here -->
+                                </tbody>
+                            </table>
+                            <div id="noItemsInContainer" class="alert alert-info d-none">
+                                This container is empty.
+                            </div>
+                        </div>
+                        
+                        <h6>Quick Actions</h6>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-primary" id="suggestRearrangementBtn">
+                                <i class="fas fa-sort"></i> Suggest Rearrangement
+                            </button>
+                            <button class="btn btn-outline-info" id="addNewItemsBtn">
+                                <i class="fas fa-plus"></i> Add New Items
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rearrangement Suggestion Modal -->
+<div class="modal fade" id="rearrangementModal" tabindex="-1" aria-labelledby="rearrangementModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="rearrangementModalLabel">Rearrangement Suggestions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="rearrangementLoading" class="text-center py-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Analyzing container and generating suggestions...</p>
+                </div>
+                
+                <div id="rearrangementResult" class="d-none">
+                    <h6>Items to Move</h6>
+                    <div id="itemsToMoveContainer">
+                        <div class="alert alert-info mb-3">
+                            No items need to be moved. The container has enough space.
+                        </div>
+                    </div>
+                    
+                    <h6>Alternative Placements</h6>
+                    <div id="alternativePlacementsContainer">
+                        <!-- Alternative placements will be loaded here -->
+                    </div>
+                </div>
+                
+                <div id="rearrangementError" class="alert alert-danger d-none">
+                    Error generating rearrangement suggestions.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary d-none" id="executeRearrangementBtn">
+                    Execute Rearrangement
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add New Items Modal -->
+<div class="modal fade" id="addNewItemsModal" tabindex="-1" aria-labelledby="addNewItemsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addNewItemsModalLabel">Add New Items to Container</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Available Items</label>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Select</th>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Dimensions</th>
+                                    <th>Priority</th>
+                                </tr>
+                            </thead>
+                            <tbody id="availableItemsTable">
+                                <!-- Available items will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="noAvailableItems" class="alert alert-info d-none">
+                        No items available to add.
+                    </div>
+                </div>
+                
+                <div id="selectedItemsList" class="mb-3 d-none">
+                    <label class="form-label">Selected Items</label>
+                    <ul class="list-group" id="selectedItemsUl">
+                        <!-- Selected items will be listed here -->
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="suggestPlacementsBtn">Suggest Placements</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Astronaut Name Modal -->
+<div class="modal fade" id="astronautNameModal" tabindex="-1" aria-labelledby="astronautNameModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="astronautNameModalLabel">Enter Astronaut Name</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="astronautName" class="form-label">Astronaut Name</label>
+                    <input type="text" class="form-control" id="astronautName" placeholder="Enter astronaut name...">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmAstronautBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast container for notifications -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Global variables
+let containers = [];
+let currentContainer = null;
+let currentZoneFilter = 'all';
+let selectedItems = [];
+let actionType = null;
+let itemToRetrieve = null;
+
+// Initialize when the DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Load containers
+    loadContainers();
+    
+    // Set up event listeners
+    setupEventListeners();
+});
+
+// Set up event listeners
+function setupEventListeners() {
+    // Refresh button
+    document.getElementById('refreshContainersBtn').addEventListener('click', loadContainers);
+    
+    // View 3D overview button
+    document.getElementById('viewAll3DBtn').addEventListener('click', showOverview3D);
+    
+    // Zone filter links
+    const zoneLinks = document.querySelectorAll('#zoneFilterList a');
+    zoneLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            setZoneFilter(link.dataset.zone);
+        });
+    });
+    
+    // Suggest rearrangement button
+    document.getElementById('suggestRearrangementBtn').addEventListener('click', suggestRearrangement);
+    
+    // Add new items button
+    document.getElementById('addNewItemsBtn').addEventListener('click', showAddNewItemsModal);
+    
+    // Suggest placements button
+    document.getElementById('suggestPlacementsBtn').addEventListener('click', suggestPlacements);
+    
+    // Confirm astronaut button
+    document.getElementById('confirmAstronautBtn').addEventListener('click', confirmAstronautAction);
+}
+
+// Load containers from API
+async function loadContainers() {
+    try {
+        // Show loading state
+        document.getElementById('loadingContainers').classList.remove('d-none');
+        document.getElementById('containersGrid').classList.add('d-none');
+        document.getElementById('noContainersMessage').classList.add('d-none');
+        
+        // Fetch containers
+        const response = await fetch('/api/containers');
+        const data = await response.json();
+        
+        // Hide loading state
+        document.getElementById('loadingContainers').classList.add('d-none');
+        
+        if (data.success) {
+            containers = data.data;
+            renderContainers();
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+            document.getElementById('noContainersMessage').classList.remove('d-none');
+        }
+    } catch (error) {
+        console.error('Error loading containers:', error);
+        document.getElementById('loadingContainers').classList.add('d-none');
+        document.getElementById('noContainersMessage').classList.remove('d-none');
+        showToast('Error loading containers. Please try again.', 'danger');
+    }
+}
+
+// Render containers in the grid
+function renderContainers() {
+    const grid = document.getElementById('containersGrid');
+    grid.innerHTML = '';
+    
+    // Filter containers by zone if needed
+    let filteredContainers = containers;
+    if (currentZoneFilter !== 'all') {
+        filteredContainers = containers.filter(container => container.zone_id == currentZoneFilter);
+    }
+    
+    // Show/hide containers grid and no containers message
+    if (filteredContainers.length === 0) {
+        document.getElementById('containersGrid').classList.add('d-none');
+        document.getElementById('noContainersMessage').classList.remove('d-none');
+        return;
+    } else {
+        document.getElementById('containersGrid').classList.remove('d-none');
+        document.getElementById('noContainersMessage').classList.add('d-none');
+    }
+    
+    // Create a card for each container
+    filteredContainers.forEach(container => {
+        const card = document.createElement('div');
+        card.className = 'col';
+        
+        card.innerHTML = `
+            <div class="card h-100 bg-dark text-white">
+                <div class="card-header">
+                    <h5 class="mb-0">${container.id}</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text"><strong>Zone:</strong> ${container.zone_name}</p>
+                    <p class="card-text"><strong>Dimensions:</strong> ${container.width} × ${container.depth} × ${container.height} cm</p>
+                    <div class="text-center my-3" style="height: 100px;">
+                        <div class="container-preview" data-container-id="${container.id}" style="width: 100%; height: 100%;"></div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-primary w-100 view-container-btn" data-container-id="${container.id}">
+                        <i class="fas fa-eye"></i> View Container
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        grid.appendChild(card);
+    });
+    
+    // Add click event to view buttons
+    const viewButtons = document.querySelectorAll('.view-container-btn');
+    viewButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            viewContainerDetails(button.dataset.containerId);
+        });
+    });
+    
+    // Initialize preview visualizations
+    const previewElements = document.querySelectorAll('.container-preview');
+    previewElements.forEach(element => {
+        initializePreview(element, element.dataset.containerId);
+    });
+}
+
+// Set zone filter
+function setZoneFilter(zoneId) {
+    currentZoneFilter = zoneId;
+    
+    // Update dropdown button text
+    const selectedZone = document.querySelector(`#zoneFilterList a[data-zone="${zoneId}"]`);
+    const dropdownButton = document.getElementById('zoneFilterDropdown');
+    
+    if (zoneId === 'all') {
+        dropdownButton.textContent = 'Filter by Zone';
+    } else {
+        dropdownButton.textContent = `Zone: ${selectedZone.textContent}`;
+    }
+    
+    // Update active class
+    const zoneLinks = document.querySelectorAll('#zoneFilterList a');
+    zoneLinks.forEach(link => {
+        link.classList.remove('active');
+    });
+    selectedZone.classList.add('active');
+    
+    // Re-render containers
+    renderContainers();
+}
+
+// Initialize a small preview visualization
+function initializePreview(element, containerId) {
+    // Set up a simple preview scene
+    const width = element.clientWidth;
+    const height = element.clientHeight;
+    
+    // Create scene
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a1a);
+    
+    // Create camera
+    const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+    camera.position.set(50, 50, 80);
+    camera.lookAt(0, 0, 0);
+    
+    // Create renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(width, height);
+    element.appendChild(renderer.domElement);
+    
+    // Add ambient light
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+    scene.add(ambientLight);
+    
+    // Add directional light
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(50, 50, 50);
+    scene.add(directionalLight);
+    
+    // Find the container
+    const container = containers.find(c => c.id === containerId);
+    if (!container) return;
+    
+    // Create container wireframe
+    const geometry = new THREE.BoxGeometry(container.width, container.height, container.depth);
+    const edges = new THREE.EdgesGeometry(geometry);
+    const material = new THREE.LineBasicMaterial({ color: 0x4080ff });
+    const wireframe = new THREE.LineSegments(edges, material);
+    
+    // Center the container
+    wireframe.position.set(container.width / 2, container.height / 2, container.depth / 2);
+    scene.add(wireframe);
+    
+    // Render the scene
+    renderer.render(scene, camera);
+    
+    // Add a slow rotation animation
+    function animate() {
+        requestAnimationFrame(animate);
+        wireframe.rotation.y += 0.01;
+        renderer.render(scene, camera);
+    }
+    
+    animate();
+}
+
+// View container details
+async function viewContainerDetails(containerId) {
+    try {
+        currentContainer = containerId;
+        
+        // Show loading state in modal
+        document.getElementById('detailContainerId').textContent = 'Loading...';
+        document.getElementById('detailContainerDimensions').textContent = 'Loading...';
+        document.getElementById('detailContainerZone').textContent = 'Loading...';
+        document.getElementById('detailContainerItemCount').textContent = 'Loading...';
+        document.getElementById('detailContainerSpaceUsage').textContent = 'Loading...';
+        
+        document.getElementById('containerItemsTable').innerHTML = `
+            <tr>
+                <td colspan="3" class="text-center">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    Loading items...
+                </td>
+            </tr>
+        `;
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('containerDetailsModal'));
+        modal.show();
+        
+        // Fetch container details
+        const response = await fetch(`/api/containers/${containerId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const container = data.data;
+            
+            // Update container details
+            document.getElementById('detailContainerId').textContent = container.id;
+            document.getElementById('detailContainerDimensions').textContent = `${container.width} × ${container.depth} × ${container.height} cm`;
+            document.getElementById('detailContainerZone').textContent = container.zone_name;
+            
+            const itemCount = container.items ? container.items.length : 0;
+            document.getElementById('detailContainerItemCount').textContent = itemCount;
+            
+            // Calculate space usage
+            let spaceUsage = 0;
+            if (itemCount > 0) {
+                const containerVolume = container.width * container.depth * container.height;
+                let usedVolume = 0;
+                
+                container.items.forEach(item => {
+                    usedVolume += item.width * item.depth * item.height;
+                });
+                
+                spaceUsage = Math.round((usedVolume / containerVolume) * 100);
+            }
+            
+            document.getElementById('detailContainerSpaceUsage').textContent = spaceUsage;
+            
+            // Update items table
+            const itemsTable = document.getElementById('containerItemsTable');
+            const noItemsMessage = document.getElementById('noItemsInContainer');
+            
+            if (itemCount === 0) {
+                itemsTable.innerHTML = '';
+                noItemsMessage.classList.remove('d-none');
+            } else {
+                noItemsMessage.classList.add('d-none');
+                itemsTable.innerHTML = '';
+                
+                container.items.forEach(item => {
+                    const row = document.createElement('tr');
+                    
+                    // Add class based on priority or waste status
+                    if (item.is_waste) {
+                        row.classList.add('table-danger');
+                    } else if (item.priority >= 80) {
+                        row.classList.add('table-warning');
+                    }
+                    
+                    row.innerHTML = `
+                        <td>${item.name}</td>
+                        <td>${item.priority}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-info view-item-location-btn" 
+                                    data-item-id="${item.id}"
+                                    data-item-name="${item.name}"
+                                    title="Highlight Location">
+                                <i class="fas fa-search-location"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary retrieve-item-btn"
+                                    data-item-id="${item.id}"
+                                    data-item-name="${item.name}"
+                                    title="Retrieve Item">
+                                <i class="fas fa-hand-paper"></i>
+                            </button>
+                        </td>
+                    `;
+                    
+                    itemsTable.appendChild(row);
+                });
+                
+                // Add event listeners to buttons
+                const viewLocationButtons = document.querySelectorAll('.view-item-location-btn');
+                viewLocationButtons.forEach(button => {
+                    button.addEventListener('click', () => {
+                        highlightItemInVisualization(button.dataset.itemId);
+                    });
+                });
+                
+                const retrieveButtons = document.querySelectorAll('.retrieve-item-btn');
+                retrieveButtons.forEach(button => {
+                    button.addEventListener('click', () => {
+                        initiateItemRetrieval(button.dataset.itemId, button.dataset.itemName);
+                    });
+                });
+            }
+            
+            // Initialize 3D visualization
+            initializeContainerVisualization(container);
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error viewing container details:', error);
+        showToast('Error loading container details. Please try again.', 'danger');
+    }
+}
+
+// Initialize the container visualization
+function initializeContainerVisualization(container) {
+    // Get the container element
+    const containerElement = document.getElementById('containerVisualization');
+    
+    // Clear any existing content
+    while (containerElement.firstChild) {
+        containerElement.removeChild(containerElement.firstChild);
+    }
+    
+    // Set up dimensions
+    const width = containerElement.clientWidth;
+    const height = containerElement.clientHeight;
+    
+    // Initialize the scene
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a1a);
+    
+    // Set up camera
+    const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+    camera.position.set(container.width * 1.5, container.height * 1.5, container.depth * 1.5);
+    
+    // Set up renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(width, height);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    containerElement.appendChild(renderer.domElement);
+    
+    // Set up orbit controls
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    
+    // Add ambient light
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+    scene.add(ambientLight);
+    
+    // Add directional light
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(container.width, container.height, container.depth);
+    directionalLight.castShadow = true;
+    scene.add(directionalLight);
+    
+    // Add a point light inside the container
+    const pointLight = new THREE.PointLight(0xffffff, 0.5);
+    pointLight.position.set(container.width / 2, container.height / 2, container.depth / 2);
+    scene.add(pointLight);
+    
+    // Add a grid helper
+    const gridHelper = new THREE.GridHelper(Math.max(container.width, container.depth) * 2, 20);
+    scene.add(gridHelper);
+    
+    // Create container wireframe
+    const geometry = new THREE.BoxGeometry(container.width, container.height, container.depth);
+    const edges = new THREE.EdgesGeometry(geometry);
+    const material = new THREE.LineBasicMaterial({ color: 0x4080ff, linewidth: 2 });
+    const wireframe = new THREE.LineSegments(edges, material);
+    
+    // Position the container so its bottom corner is at the origin
+    wireframe.position.set(container.width / 2, container.height / 2, container.depth / 2);
+    scene.add(wireframe);
+    
+    // Create a plane to represent the open face
+    const openFaceGeometry = new THREE.PlaneGeometry(container.width, container.height);
+    const openFaceMaterial = new THREE.MeshBasicMaterial({
+        color: 0x4080ff,
+        transparent: true,
+        opacity: 0.1,
+        side: THREE.DoubleSide
+    });
+    const openFace = new THREE.Mesh(openFaceGeometry, openFaceMaterial);
+    openFace.position.set(container.width / 2, container.height / 2, 0);
+    scene.add(openFace);
+    
+    // Add items to the container
+    const itemMeshes = {};
+    if (container.items && container.items.length > 0) {
+        container.items.forEach(item => {
+            if (item.x_pos === null || item.y_pos === null || item.z_pos === null) return;
+            
+            const itemWidth = item.rotated ? item.depth : item.width;
+            const itemDepth = item.rotated ? item.width : item.depth;
+            const itemHeight = item.height;
+            
+            // Create item geometry
+            const itemGeometry = new THREE.BoxGeometry(itemWidth, itemHeight, itemDepth);
+            
+            // Determine color based on item properties
+            let color;
+            if (item.is_waste) {
+                color = 0xff0000; // Red for waste
+            } else if (item.is_expired) {
+                color = 0xff9900; // Orange for expired
+            } else if (item.priority >= 80) {
+                color = 0x00ff00; // Green for high priority
+            } else if (item.priority >= 50) {
+                color = 0xffff00; // Yellow for medium priority
+            } else {
+                color = 0x0099ff; // Blue for low priority
+            }
+            
+            const itemMaterial = new THREE.MeshLambertMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const itemMesh = new THREE.Mesh(itemGeometry, itemMaterial);
+            
+            // Position the item
+            itemMesh.position.set(
+                item.x_pos + itemWidth / 2,
+                item.z_pos + itemHeight / 2, // z_pos in database is the height position in 3D space
+                item.y_pos + itemDepth / 2  // y_pos in database is the depth position in 3D space
+            );
+            
+            scene.add(itemMesh);
+            
+            // Add wireframe to show edges
+            const itemEdges = new THREE.EdgesGeometry(itemGeometry);
+            const itemLines = new THREE.LineSegments(
+                itemEdges,
+                new THREE.LineBasicMaterial({ color: 0x000000 })
+            );
+            itemMesh.add(itemLines);
+            
+            // Store reference to the mesh
+            itemMeshes[item.id] = {
+                mesh: itemMesh,
+                originalColor: color,
+                highlighted: false
+            };
+        });
+    }
+    
+    // Function to highlight an item
+    window.highlightItemInVisualization = function(itemId) {
+        // Clear any previous highlights
+        Object.values(itemMeshes).forEach(item => {
+            if (item.highlighted) {
+                item.mesh.material.color.setHex(item.originalColor);
+                item.mesh.material.opacity = 0.8;
+                item.highlighted = false;
+            }
+        });
+        
+        // Highlight the selected item
+        if (itemMeshes[itemId]) {
+            const item = itemMeshes[itemId];
+            item.mesh.material.color.setHex(0xffffff); // White highlight
+            item.mesh.material.opacity = 1.0;
+            item.highlighted = true;
+            
+            // Animate the highlight (pulsing effect)
+            let direction = 1;
+            const animateHighlight = function() {
+                if (!item.highlighted) return;
+                
+                item.mesh.material.opacity += direction * 0.01;
+                
+                if (item.mesh.material.opacity >= 1.0) {
+                    direction = -1;
+                } else if (item.mesh.material.opacity <= 0.6) {
+                    direction = 1;
+                }
+                
+                requestAnimationFrame(animateHighlight);
+            };
+            
+            animateHighlight();
+        }
+    };
+    
+    // Center camera on container
+    controls.target.set(container.width / 2, container.height / 2, container.depth / 2);
+    controls.update();
+    
+    // Animation loop
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+    }
+    
+    animate();
+}
+
+// Suggest rearrangement for current container
+async function suggestRearrangement() {
+    if (!currentContainer) return;
+    
+    // Show rearrangement modal
+    const modal = new bootstrap.Modal(document.getElementById('rearrangementModal'));
+    modal.show();
+    
+    // Show loading state
+    document.getElementById('rearrangementLoading').classList.remove('d-none');
+    document.getElementById('rearrangementResult').classList.add('d-none');
+    document.getElementById('rearrangementError').classList.add('d-none');
+    document.getElementById('executeRearrangementBtn').classList.add('d-none');
+    
+    try {
+        // Get unplaced items for potential placement
+        const itemsResponse = await fetch('/api/items');
+        const itemsData = await itemsResponse.json();
+        
+        if (!itemsData.success) {
+            throw new Error('Failed to fetch items');
+        }
+        
+        // Filter for unplaced items
+        const unplacedItems = itemsData.data.filter(item => !item.container_id && !item.is_waste);
+        
+        if (unplacedItems.length === 0) {
+            document.getElementById('rearrangementLoading').classList.add('d-none');
+            document.getElementById('rearrangementResult').classList.remove('d-none');
+            document.getElementById('itemsToMoveContainer').innerHTML = `
+                <div class="alert alert-info mb-3">
+                    No unplaced items available to analyze for rearrangement.
+                </div>
+            `;
+            return;
+        }
+        
+        // Get item IDs for the API call
+        const itemIds = unplacedItems.map(item => item.id);
+        
+        // Call rearrangement API
+        const response = await fetch('/api/rearrangement/suggest', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                container_id: currentContainer,
+                new_item_ids: itemIds
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Hide loading state
+        document.getElementById('rearrangementLoading').classList.add('d-none');
+        
+        if (data.success) {
+            document.getElementById('rearrangementResult').classList.remove('d-none');
+            
+            const suggestion = data.data;
+            
+            // Show items to move
+            if (suggestion.items_to_move.length === 0) {
+                document.getElementById('itemsToMoveContainer').innerHTML = `
+                    <div class="alert alert-success mb-3">
+                        No items need to be moved. The container has enough space.
+                    </div>
+                `;
+            } else {
+                let html = `
+                    <div class="alert alert-warning mb-3">
+                        ${suggestion.items_to_move.length} items need to be moved to make space.
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Dimensions</th>
+                                    <th>Priority</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                suggestion.items_to_move.forEach(item => {
+                    html += `
+                        <tr>
+                            <td>${item.id}</td>
+                            <td>${item.name}</td>
+                            <td>${item.width} × ${item.depth} × ${item.height} cm</td>
+                            <td>${item.priority}</td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                document.getElementById('itemsToMoveContainer').innerHTML = html;
+            }
+            
+            // Show alternative placements
+            if (suggestion.alternative_placements && suggestion.alternative_placements.length > 0) {
+                let html = `
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Current Container</th>
+                                    <th>Suggested Container</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                suggestion.alternative_placements.forEach(placement => {
+                    html += `
+                        <tr>
+                            <td>${placement.item_name}</td>
+                            <td>${placement.current_container}</td>
+                            <td>${placement.suggested_container}</td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                document.getElementById('alternativePlacementsContainer').innerHTML = html;
+                
+                // Show execute button if we have alternative placements
+                document.getElementById('executeRearrangementBtn').classList.remove('d-none');
+            } else {
+                document.getElementById('alternativePlacementsContainer').innerHTML = `
+                    <div class="alert alert-info">
+                        No alternative placements were found.
+                    </div>
+                `;
+            }
+            
+            // Show new item placements if available
+            if (suggestion.space_available && suggestion.new_item_placements) {
+                let placementsHtml = `
+                    <h6 class="mt-4">New Item Placements</h6>
+                    <div class="alert alert-success mb-3">
+                        ${suggestion.new_item_placements.length} items can be placed in this container.
+                    </div>
+                `;
+                
+                if (suggestion.new_item_placements.length > 0) {
+                    placementsHtml += `
+                        <div class="table-responsive">
+                            <table class="table table-dark table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th>Position</th>
+                                        <th>Rotated</th>
+                                        <th>Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+                    
+                    suggestion.new_item_placements.forEach(placement => {
+                        placementsHtml += `
+                            <tr>
+                                <td>${placement.item_name}</td>
+                                <td>(${placement.x}, ${placement.y}, ${placement.z})</td>
+                                <td>${placement.rotated ? 'Yes' : 'No'}</td>
+                                <td>${placement.score.toFixed(2)}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    placementsHtml += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                }
+                
+                document.getElementById('alternativePlacementsContainer').innerHTML += placementsHtml;
+            }
+        } else {
+            document.getElementById('rearrangementError').classList.remove('d-none');
+            document.getElementById('rearrangementError').textContent = data.error;
+        }
+    } catch (error) {
+        console.error('Error suggesting rearrangement:', error);
+        document.getElementById('rearrangementLoading').classList.add('d-none');
+        document.getElementById('rearrangementError').classList.remove('d-none');
+        document.getElementById('rearrangementError').textContent = 'Error generating rearrangement suggestions.';
+    }
+}
+
+// Show add new items modal
+async function showAddNewItemsModal() {
+    if (!currentContainer) return;
+    
+    // Reset state
+    selectedItems = [];
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('addNewItemsModal'));
+    modal.show();
+    
+    document.getElementById('selectedItemsList').classList.add('d-none');
+    document.getElementById('availableItemsTable').innerHTML = `
+        <tr>
+            <td colspan="5" class="text-center">
+                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                Loading items...
+            </td>
+        </tr>
+    `;
+    
+    try {
+        // Fetch all items
+        const response = await fetch('/api/items');
+        const data = await response.json();
+        
+        if (data.success) {
+            // Filter for unplaced items
+            const unplacedItems = data.data.filter(item => !item.container_id && !item.is_waste);
+            
+            const tableBody = document.getElementById('availableItemsTable');
+            const noItemsMessage = document.getElementById('noAvailableItems');
+            
+            if (unplacedItems.length === 0) {
+                tableBody.innerHTML = '';
+                noItemsMessage.classList.remove('d-none');
+            } else {
+                noItemsMessage.classList.add('d-none');
+                tableBody.innerHTML = '';
+                
+                unplacedItems.forEach(item => {
+                    const row = document.createElement('tr');
+                    
+                    row.innerHTML = `
+                        <td>
+                            <div class="form-check">
+                                <input class="form-check-input item-select-check" type="checkbox" value="${item.id}" 
+                                       data-item-name="${item.name}" id="check-${item.id}">
+                            </div>
+                        </td>
+                        <td>${item.id}</td>
+                        <td>${item.name}</td>
+                        <td>${item.width} × ${item.depth} × ${item.height} cm</td>
+                        <td>${item.priority}</td>
+                    `;
+                    
+                    tableBody.appendChild(row);
+                });
+                
+                // Add event listeners to checkboxes
+                const checkboxes = document.querySelectorAll('.item-select-check');
+                checkboxes.forEach(checkbox => {
+                    checkbox.addEventListener('change', () => {
+                        updateSelectedItems();
+                    });
+                });
+            }
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error loading items:', error);
+        showToast('Error loading items. Please try again.', 'danger');
+    }
+}
+
+// Update the selected items list
+function updateSelectedItems() {
+    selectedItems = [];
+    const selectedList = document.getElementById('selectedItemsUl');
+    selectedList.innerHTML = '';
+    
+    const checkboxes = document.querySelectorAll('.item-select-check:checked');
+    checkboxes.forEach(checkbox => {
+        selectedItems.push({
+            id: checkbox.value,
+            name: checkbox.dataset.itemName
+        });
+        
+        const listItem = document.createElement('li');
+        listItem.className = 'list-group-item bg-dark text-white d-flex justify-content-between align-items-center';
+        listItem.innerHTML = `
+            ${checkbox.dataset.itemName}
+            <span class="badge bg-primary rounded-pill">ID: ${checkbox.value}</span>
+        `;
+        
+        selectedList.appendChild(listItem);
+    });
+    
+    // Show/hide selected items list
+    if (selectedItems.length > 0) {
+        document.getElementById('selectedItemsList').classList.remove('d-none');
+    } else {
+        document.getElementById('selectedItemsList').classList.add('d-none');
+    }
+}
+
+// Suggest placements for selected items
+async function suggestPlacements() {
+    if (selectedItems.length === 0) {
+        showToast('Please select at least one item', 'warning');
+        return;
+    }
+    
+    // Close the modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('addNewItemsModal'));
+    modal.hide();
+    
+    // Set current action to 'placement'
+    actionType = 'placement';
+    
+    // Show astronaut name modal
+    document.getElementById('astronautNameModalLabel').textContent = 'Enter Astronaut Name for Placement';
+    document.getElementById('astronautName').value = '';
+    
+    const astronautModal = new bootstrap.Modal(document.getElementById('astronautNameModal'));
+    astronautModal.show();
+}
+
+// Initiate item retrieval
+function initiateItemRetrieval(itemId, itemName) {
+    itemToRetrieve = itemId;
+    actionType = 'retrieval';
+    
+    // Show astronaut name modal
+    document.getElementById('astronautNameModalLabel').textContent = `Retrieve ${itemName}`;
+    document.getElementById('astronautName').value = '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('astronautNameModal'));
+    modal.show();
+}
+
+// Confirm astronaut action (for retrieval or placement)
+async function confirmAstronautAction() {
+    const astronautName = document.getElementById('astronautName').value.trim();
+    
+    if (!astronautName) {
+        showToast('Please enter astronaut name', 'warning');
+        return;
+    }
+    
+    // Disable the confirm button
+    const confirmButton = document.getElementById('confirmAstronautBtn');
+    confirmButton.disabled = true;
+    confirmButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+    
+    if (actionType === 'retrieval') {
+        await executeRetrieval(astronautName);
+    } else if (actionType === 'placement') {
+        await executeBatchPlacement(astronautName);
+    }
+    
+    // Reset the button
+    confirmButton.disabled = false;
+    confirmButton.innerHTML = 'Confirm';
+}
+
+// Execute retrieval of an item
+async function executeRetrieval(astronautName) {
+    if (!itemToRetrieve) return;
+    
+    try {
+        const response = await fetch('/api/retrieval/execute', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                item_id: itemToRetrieve,
+                astronaut_name: astronautName,
+                use_item: false
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('astronautNameModal'));
+        modal.hide();
+        
+        if (data.success) {
+            showToast(`Item retrieved successfully by ${astronautName}`, 'success');
+            
+            // Refresh container details
+            viewContainerDetails(currentContainer);
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error retrieving item:', error);
+        showToast('Error retrieving item. Please try again.', 'danger');
+    } finally {
+        // Reset retrieval state
+        itemToRetrieve = null;
+        actionType = null;
+    }
+}
+
+// Execute batch placement of items
+async function executeBatchPlacement(astronautName) {
+    if (selectedItems.length === 0) return;
+    
+    try {
+        // Get batch placement suggestions
+        const suggestResponse = await fetch('/api/placement/batch', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                item_ids: selectedItems.map(item => item.id)
+            })
+        });
+        
+        const suggestData = await suggestResponse.json();
+        
+        if (!suggestData.success) {
+            showToast(`Error: ${suggestData.error}`, 'danger');
+            return;
+        }
+        
+        const placements = suggestData.data;
+        
+        // Execute each placement
+        const results = [];
+        
+        for (const placement of placements) {
+            if (placement.container_id !== currentContainer) continue;
+            
+            try {
+                const response = await fetch('/api/placement/execute', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        item_id: placement.item_id,
+                        container_id: placement.container_id,
+                        x: placement.x,
+                        y: placement.y,
+                        z: placement.z,
+                        rotated: placement.rotated,
+                        astronaut_name: astronautName
+                    })
+                });
+                
+                const data = await response.json();
+                
+                results.push({
+                    item_id: placement.item_id,
+                    item_name: placement.item_name,
+                    success: data.success,
+                    error: data.error
+                });
+            } catch (error) {
+                console.error(`Error placing item ${placement.item_id}:`, error);
+                results.push({
+                    item_id: placement.item_id,
+                    item_name: placement.item_name,
+                    success: false,
+                    error: 'Network error'
+                });
+            }
+        }
+        
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('astronautNameModal'));
+        modal.hide();
+        
+        // Show results
+        const successCount = results.filter(r => r.success).length;
+        
+        if (successCount === 0) {
+            showToast('No items were successfully placed', 'warning');
+        } else if (successCount === results.length) {
+            showToast(`All ${successCount} items were successfully placed`, 'success');
+        } else {
+            showToast(`${successCount} out of ${results.length} items were successfully placed`, 'info');
+        }
+        
+        // Refresh container details
+        viewContainerDetails(currentContainer);
+    } catch (error) {
+        console.error('Error in batch placement:', error);
+        showToast('Error placing items. Please try again.', 'danger');
+    } finally {
+        // Reset placement state
+        selectedItems = [];
+        actionType = null;
+    }
+}
+
+// Show 3D overview of all containers
+function showOverview3D() {
+    showToast('3D Overview feature coming soon!', 'info');
+}
+
+// Helper function to show toast notifications
+function showToast(message, type = 'info') {
+    const toastContainer = document.getElementById('toastContainer');
+    const toastId = 'toast-' + Date.now();
+    
+    const html = `
+        <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    `;
+    
+    toastContainer.insertAdjacentHTML('beforeend', html);
+    
+    const toastElement = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastElement, { autohide: true, delay: 5000 });
+    toast.show();
+    
+    // Remove the toast element after it's hidden
+    toastElement.addEventListener('hidden.bs.toast', function() {
+        toastElement.remove();
+    });
+}
+</script>
+{% endblock %}

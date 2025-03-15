@@ -1,0 +1,168 @@
+/* Main styles for Space Station Cargo Management System */
+
+/* Global styling */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow-x: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+    min-height: 100vh;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+/* Cards and containers */
+.card {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* 3D Container visualization */
+#containerVisualization {
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+/* Item grid */
+.item-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.item-card {
+    transition: all 0.2s ease;
+}
+
+.item-card:hover {
+    transform: scale(1.02);
+}
+
+/* Waste item styling */
+.waste-item {
+    border-left: 4px solid var(--bs-danger);
+}
+
+.expired-item {
+    border-left: 4px solid var(--bs-warning);
+}
+
+/* Range slider value styling */
+.range-value-display {
+    font-size: 1.2rem;
+    font-weight: bold;
+    text-align: center;
+}
+
+/* 3D controls */
+.scene-controls {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 5px;
+    border-radius: 5px;
+    z-index: 100;
+}
+
+/* Loader animation */
+.loader {
+    display: inline-block;
+    width: 30px;
+    height: 30px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: var(--bs-primary);
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Priority indicator */
+.priority-indicator {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+}
+
+.priority-high {
+    background-color: var(--bs-danger);
+}
+
+.priority-medium {
+    background-color: var(--bs-warning);
+}
+
+.priority-low {
+    background-color: var(--bs-success);
+}
+
+/* Empty state styling */
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--bs-secondary);
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+/* Timeline for simulation */
+.timeline {
+    position: relative;
+    padding: 20px 0;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 15px;
+    height: 100%;
+    width: 2px;
+    background: var(--bs-primary);
+}
+
+.timeline-item {
+    position: relative;
+    margin-left: 30px;
+    background: var(--bs-dark);
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -22px;
+    top: 15px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--bs-primary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .sidebar {
+        min-height: auto;
+    }
+    
+    .item-grid {
+        grid-template-columns: 1fr;
+    }
+}
