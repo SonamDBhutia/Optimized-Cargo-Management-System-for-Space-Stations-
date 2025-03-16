@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block title %}500 Server Error - Space Station Cargo Management{% endblock %}
+
+{% block heading %}500 - Server Error{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto text-center py-5">
+        <div class="mb-4">
+            <i class="fas fa-exclamation-triangle fa-4x text-danger"></i>
+        </div>
+        <h2>System Malfunction Detected</h2>
+        <p class="lead">Our systems are experiencing technical difficulties.</p>
+        <p>The server encountered an internal error and was unable to complete your request.</p>
+        <p>Please try again later or contact system administrator if the problem persists.</p>
+        <a href="/" class="btn btn-primary mt-3">
+            <i class="fas fa-home me-2"></i>Return to Mission Control
+        </a>
+    </div>
+</div>
+{% endblock %}

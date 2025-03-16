@@ -1,7 +1,7 @@
 // Main JavaScript file for Space Station Cargo Management System
 
 // Global variables
-let currentContainer = null;
+let mainCurrentContainer = null;
 let selectedItem = null;
 let astronautName = '';
 
@@ -383,7 +383,7 @@ async function checkForWasteItems() {
 
 // Show container visualization
 function showContainerVisualization(containerId, highlightItemId = null) {
-    currentContainer = containerId;
+    mainCurrentContainer = containerId;
     
     // Show the modal
     const modal = new bootstrap.Modal(document.getElementById('visualizationModal'));
