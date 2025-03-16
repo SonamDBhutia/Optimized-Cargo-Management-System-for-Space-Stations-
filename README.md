@@ -54,7 +54,7 @@ The system is organized into several key components:
 - Python 3.11
 - PostgreSQL database
 
-### Installation
+### Installation (Standard)
 
 1. Clone the repository
 2. Install dependencies:
@@ -73,6 +73,37 @@ The system is organized into several key components:
    ```
    gunicorn --bind 0.0.0.0:5000 main:app
    ```
+
+### Docker Deployment
+
+The application can also be deployed using Docker and Docker Compose:
+
+#### Prerequisites
+- Docker
+- Docker Compose
+
+#### Deployment Steps
+
+1. Clone the repository
+2. Run the deployment script:
+   ```
+   ./docker-deploy.sh
+   ```
+   
+   Or manually:
+   ```
+   docker-compose up -d --build
+   docker-compose exec web python -c "from database import initialize_db; initialize_db()"
+   ```
+
+3. Access the application at http://localhost:5000
+
+#### Environment Variables
+
+These can be configured in the `docker-compose.yml` file:
+
+- `DATABASE_URL`: Database connection string
+- `SESSION_SECRET`: Secret key for session management
 
 ## Usage Guide
 
