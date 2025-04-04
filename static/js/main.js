@@ -403,9 +403,79 @@ function showContainerVisualization(containerId, highlightItemId = null) {
 }
 
 // Fetch container details
+        console.error('Error fetching container details:', error);
+        document.getElementById('containerContents').innerHTML = '<div class="alert alert-danger">Error loading container details</div>';
+    }
+}
+
+// Helper function to show toast notifications
+function showToast(message, type = 'info') {
+    const toastContainer = document.getElementById('toastContainer');
+    if (!toastContainer) {
+        // Create toast container if it doesn't exist
+        const container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        document.body.appendChild(container);
+    }
+    
+    const toastId = 'toast-' + Date.now();
+    const html = `
+        <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('toastContainer').insertAdjacentHTML('beforeend', html);
+    
+    const toastElement = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastElement, { autohide: true, delay: 5000 });
+    // Show the toast
+    toast.show();
+}
+
+// Make showToast available globally for use in other scripts
+window.showToast = showToast;
+
+// Make showToast available globally for use in other scripts
+window.showToast = showToast;
+    toast.show();
+    
+    // Remove the toast element after it's hidden
+    toastElement.addEventListener('hidden.bs.toast', function() {
+        toastElement.remove();
+    });
+}
+
+// Format date for display
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
+}
+// Fetch container details
 async function fetchContainerDetails(containerId) {
     try {
+        if (!containerId) {
+            console.error('Container ID is undefined or null');
+            showToast('Error: Container ID is missing', 'danger');
+            return;
+        }
+        
         const response = await fetch(`/api/containers/${containerId}`);
+        
+        if (!response.ok) {
+            const errorMsg = `Server responded with status: ${response.status}`;
+            console.error(errorMsg);
+            showToast(`Error: ${errorMsg}`, 'danger');
+            return;
+        }
+        
         const data = await response.json();
         
         if (data.success) {
@@ -448,92 +518,64 @@ async function fetchContainerDetails(containerId) {
                     
                     // Item details
                     const itemDetails = document.createElement('div');
-                    itemDetails.innerHTML = `
-                        <div>${priorityIndicator.outerHTML} ${item.name}</div>
-                        <small class="text-muted">Position: (${item.x_pos}, ${item.y_pos}, ${item.z_pos})</small>
-                    `;
+                    itemDetails.className = 'ms-2 me-auto';
+                    itemDetails.innerHTML = `<strong>${item.name}</strong> (${item.id})`;
                     
-                    // Action buttons
-                    const actionButtons = document.createElement('div');
+                    // Add details for position
+                    if (item.x_pos !== null && item.y_pos !== null && item.z_pos !== null) {
+                        const positionText = document.createElement('small');
+                        positionText.className = 'd-block text-muted';
+                        positionText.textContent = `Position: (${item.x_pos}, ${item.y_pos}, ${item.z_pos})`;
+                        itemDetails.appendChild(positionText);
+                    }
                     
-                    // Retrieve button
-                    const retrieveBtn = document.createElement('button');
-                    retrieveBtn.className = 'btn btn-sm btn-outline-primary';
-                    retrieveBtn.innerHTML = '<i class="fas fa-hand-paper"></i>';
-                    retrieveBtn.title = 'Retrieve item';
-                    retrieveBtn.onclick = () => {
-                        selectedItem = item.id;
-                        showAstronautNameModal();
-                    };
+                    // Add expiry date if present
+                    if (item.expiry_date) {
+                        const expiryText = document.createElement('small');
+                        expiryText.className = 'd-block text-muted';
+                        expiryText.textContent = `Expires: ${formatDate(item.expiry_date)}`;
+                        itemDetails.appendChild(expiryText);
+                    }
                     
-                    // Highlight button
-                    const highlightBtn = document.createElement('button');
-                    highlightBtn.className = 'btn btn-sm btn-outline-info ms-1';
-                    highlightBtn.innerHTML = '<i class="fas fa-search-location"></i>';
-                    highlightBtn.title = 'Highlight in 3D view';
-                    highlightBtn.onclick = () => {
-                        highlightItemInVisualization(item.id);
-                    };
+                    // Add usage info if present
+                    if (item.usage_limit) {
+                        const usageText = document.createElement('small');
+                        usageText.className = 'd-block text-muted';
+                        usageText.textContent = `Uses: ${item.uses_remaining}/${item.usage_limit}`;
+                        itemDetails.appendChild(usageText);
+                    }
                     
-                    actionButtons.appendChild(retrieveBtn);
-                    actionButtons.appendChild(highlightBtn);
-                    
+                    // Add item elements to list item
+                    listItem.appendChild(priorityIndicator);
                     listItem.appendChild(itemDetails);
-                    listItem.appendChild(actionButtons);
+                    
+                    // Add list item to list
                     list.appendChild(listItem);
                 });
                 
                 contentsElement.appendChild(list);
             } else {
-                contentsElement.innerHTML = '<div class="alert alert-info">This container is empty.</div>';
+                contentsElement.innerHTML = '<div class="alert alert-secondary">This container is empty.</div>';
             }
         } else {
-            document.getElementById('containerContents').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            const errorMsg = data.error || 'Unknown error occurred';
+            console.error('Error fetching container data:', errorMsg);
+            showToast(`Error: ${errorMsg}`, 'danger');
+            
+            // Update container info with error message
+            document.getElementById('containerIdDisplay').textContent = containerId;
+            document.getElementById('containerZoneDisplay').textContent = 'Error';
+            document.getElementById('containerSizeDisplay').textContent = 'Error loading container data';
+            document.getElementById('containerContents').innerHTML = '<div class="alert alert-danger">Error loading container data. Please try again.</div>';
         }
     } catch (error) {
-        console.error('Error fetching container details:', error);
-        document.getElementById('containerContents').innerHTML = '<div class="alert alert-danger">Error loading container details</div>';
+        console.error('Error viewing container details:', error);
+        showToast('Error loading container details. Please try again.', 'danger');
+        
+        // Update container info with error message
+        document.getElementById('containerIdDisplay').textContent = containerId;
+        document.getElementById('containerZoneDisplay').textContent = 'Error';
+        document.getElementById('containerSizeDisplay').textContent = 'Error loading container data';
+        document.getElementById('containerContents').innerHTML = '<div class="alert alert-danger">Error loading container data. Please try again.</div>';
     }
-}
-
-// Helper function to show toast notifications
-function showToast(message, type = 'info') {
-    const toastContainer = document.getElementById('toastContainer');
-    if (!toastContainer) {
-        // Create toast container if it doesn't exist
-        const container = document.createElement('div');
-        container.id = 'toastContainer';
-        container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-        document.body.appendChild(container);
-    }
-    
-    const toastId = 'toast-' + Date.now();
-    const html = `
-        <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div class="toast-body">
-                    ${message}
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-        </div>
-    `;
-    
-    document.getElementById('toastContainer').insertAdjacentHTML('beforeend', html);
-    
-    const toastElement = document.getElementById(toastId);
-    const toast = new bootstrap.Toast(toastElement, { autohide: true, delay: 5000 });
-    toast.show();
-    
-    // Remove the toast element after it's hidden
-    toastElement.addEventListener('hidden.bs.toast', function() {
-        toastElement.remove();
-    });
-}
-
-// Format date for display
-function formatDate(dateString) {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
 }

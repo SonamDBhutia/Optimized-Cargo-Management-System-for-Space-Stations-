@@ -83,7 +83,25 @@ function initializeContainerVisualization(containerId, highlightItemId = null) {
 // Fetch container data and render the container with its items
 async function fetchContainerDataAndRender(containerId) {
     try {
+        if (!containerId) {
+            console.error('Container ID is undefined or null');
+            if (window.showToast) {
+                window.showToast('Error: Container ID is missing', 'danger');
+            }
+            return;
+        }
+        
         const response = await fetch(`/api/containers/${containerId}`);
+        
+        if (!response.ok) {
+            const errorMsg = `Server responded with status: ${response.status}`;
+            console.error(errorMsg);
+            if (window.showToast) {
+                window.showToast(`Error: ${errorMsg}`, 'danger');
+            }
+            return;
+        }
+        
         const data = await response.json();
         
         if (data.success) {
@@ -103,11 +121,26 @@ async function fetchContainerDataAndRender(containerId) {
             if (highlightedItemId) {
                 highlightItem(highlightedItemId);
             }
+            
+            // Adjust camera to focus on the container
+            controls.target.set(
+                container.width / 2,
+                container.height / 2,
+                container.depth / 2
+            );
+            controls.update();
         } else {
-            console.error('Error fetching container data:', data.error);
+            const errorMsg = data.error || 'Unknown error occurred';
+            console.error('Error fetching container data:', errorMsg);
+            if (window.showToast) {
+                window.showToast(`Error: ${errorMsg}`, 'danger');
+            }
         }
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error viewing container details:', error);
+        if (window.showToast) {
+            window.showToast('Error loading container visualization. Please try again.', 'danger');
+        }
     }
 }
 
