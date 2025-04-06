@@ -96,7 +96,7 @@ The application can also be deployed using Docker and Docker Compose:
    docker-compose exec web python -c "from database import initialize_db; initialize_db()"
    ```
 
-3. Access the application at http://localhost:5000
+3. Access the application at http://localhost:8000
 
 #### Environment Variables
 
