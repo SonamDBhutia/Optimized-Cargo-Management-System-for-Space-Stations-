@@ -45,8 +45,3 @@ yarn-error.log*
 # Database files
 *.sqlite3
 *.db
-
-# Replit specific
-.replit
-.breakpoints
-.cache/
