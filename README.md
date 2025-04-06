@@ -71,7 +71,7 @@ The system is organized into several key components:
    ```
 5. Run the application:
    ```
-   gunicorn --bind 0.0.0.0:5000 main:app
+   gunicorn --bind 0.0.0.0:8000 main:app
    ```
 
 ### Docker Deployment
